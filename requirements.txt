@@ -1,0 +1,5 @@
+PyQt6>=6.5.0
+pywin32>=306
+beautifulsoup4>=4.12
+pyinstaller>=6.0
+pytest>=8.0
