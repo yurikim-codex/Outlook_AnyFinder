@@ -1,7 +1,7 @@
 [README.md](https://github.com/user-attachments/files/28314954/README.md)
 # 📧 OutLook AnyFinder Ver0.9 for SESUNG Team
 
-> **파일을 찾지 말고, 메일을 찾으세요.**
+> **메일검색에 시간을 낭비하지 마세요.**
 > Outlook 메일의 내용을 로컬 인덱싱하여 즉시 검색하는 Windows 데스크톱 앱
 
 ---
