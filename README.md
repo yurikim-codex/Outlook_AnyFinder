@@ -115,7 +115,6 @@ outlook_anyfinder/
 |------|------|
 | [개발상세계획서](./개발상세계획서_OutLook_AnyFinder.md) | 상세 계획, 체크포인트, 테스트 계획 |
 | [기술분석서](./기술분석_메일접근_및_인덱싱전략.md) | 메일 접근 방식 & 인덱싱 전략 비교 |
-| [Anything 참조분석](./Anything_참조분석_및_메일검색앱_설계.md) | UI/UX 참조 분석 & 설계 |
 
 ---
 
@@ -127,4 +126,4 @@ outlook_anyfinder/
 
 ---
 
-> **OutLook AnyFinder** · Made for SESUNG Team
+> **OutLook AnyFinder** · Made for SESUNG Team [Coding by yurikim]
