@@ -53,6 +53,10 @@ PREFIX_MAP = {
     "수신:":       "recipients",
     "subject:":    "subject",
     "제목:":       "subject",
+    "attachment_name:": "attachment_names",
+    "attachment_names:": "attachment_names",
+    "첨부파일:":    "attachment_names",
+    "첨부파일명:":  "attachment_names",
     "cc:":         "recipients",  # CC도 수신자로 검색
 }
 
@@ -78,12 +82,17 @@ READ_MAP = {
 }
 
 
-def parse_query(raw_input: str) -> ParsedQuery:
+def parse_query(raw_input: str, search_columns: Optional[List[str]] = None,
+                match_operator: str = "AND", contains_search: bool = False) -> ParsedQuery:
     """
     사용자 검색어를 파싱하여 ParsedQuery 반환
 
     Args:
         raw_input: 사용자가 입력한 검색 문자열
+        search_columns: 일반 키워드를 제한할 FTS 컬럼 목록.
+            예: ["subject"], ["attachment_names"], None=전체 FTS 컬럼
+        match_operator: 일반 토큰 결합 방식. "AND" 또는 "OR"
+        contains_search: True이면 일반 검색어를 FTS 단어검색 대신 LIKE 포함검색으로 처리
 
     Returns:
         ParsedQuery: FTS5 쿼리 + WHERE 절
@@ -99,6 +108,8 @@ def parse_query(raw_input: str) -> ParsedQuery:
 
     fts_parts = []
     tokens = _tokenize(raw)
+    search_columns = [c for c in (search_columns or []) if c]
+    joiner = " OR " if str(match_operator).upper() == "OR" else " AND "
 
     for token in tokens:
         handled = False
@@ -108,7 +119,22 @@ def parse_query(raw_input: str) -> ParsedQuery:
             if token.lower().startswith(prefix):
                 value = token[len(prefix):]
                 if value:
-                    fts_parts.append(f"{fts_col}:{_escape_fts(value)}")
+                    # subject:바이오+견적서 같은 컬럼 지정 멀티 검색도 지원
+                    if "+" in value:
+                        for part in value.split("+"):
+                            escaped = _escape_fts(part)
+                            if escaped:
+                                if contains_search:
+                                    _add_contains_clause(result, escaped, [fts_col])
+                                else:
+                                    fts_parts.append(f"{fts_col}:{escaped}")
+                    else:
+                        escaped = _escape_fts(value)
+                        if escaped:
+                            if contains_search:
+                                _add_contains_clause(result, escaped, [fts_col])
+                            else:
+                                fts_parts.append(f"{fts_col}:{escaped}")
                 handled = True
                 break
 
@@ -155,24 +181,47 @@ def parse_query(raw_input: str) -> ParsedQuery:
                 result.where_params.append(read_val)
             continue
 
-        # ── 5. 제외어 (-반려)
+        # ── 5. 메일 주소 검색 (FTS 토크나이저/특수문자 이슈를 피하기 위해 LIKE 필터 사용)
+        if _looks_like_email(token):
+            result.where_clauses.append("(e.sender_email LIKE ? OR e.recipients LIKE ? OR e.cc LIKE ?)")
+            like = f"%{token}%"
+            result.where_params.extend([like, like, like])
+            continue
+
+        # ── 6. 제외어 (-반려)
         if token.startswith("-") and len(token) > 1:
             fts_parts.append(f"NOT {_escape_fts(token[1:])}")
             continue
 
-        # ── 6. 구문 검색 ("정확한 구문")
+        # ── 7. 구문 검색 ("정확한 구문")
         if token.startswith('"') and token.endswith('"') and len(token) > 2:
-            fts_parts.append(token)  # 따옴표 유지
+            fts_parts.append(_apply_column_scope(token, search_columns))  # 따옴표 유지
             continue
 
-        # ── 7. 일반 키워드
+        # ── 8. + 멀티 검색
+        # 예: "바이오+견적서" → "바이오" AND "견적서"가 모두 포함된 메일 검색
+        # 이메일 주소의 +는 위의 메일 주소 검색에서 먼저 처리되므로 여기서는 일반 단어만 분리한다.
+        if "+" in token:
+            for part in token.split("+"):
+                escaped = _escape_fts(part)
+                if escaped:
+                    if contains_search:
+                        _add_contains_clause(result, escaped, search_columns)
+                    else:
+                        fts_parts.append(_apply_column_scope(escaped, search_columns))
+            continue
+
+        # ── 9. 일반 키워드
         escaped = _escape_fts(token)
         if escaped:
-            fts_parts.append(escaped)
+            if contains_search:
+                _add_contains_clause(result, escaped, search_columns)
+            else:
+                fts_parts.append(_apply_column_scope(escaped, search_columns))
 
     # FTS 쿼리 조합
     if fts_parts:
-        result.fts_query = " AND ".join(fts_parts)
+        result.fts_query = joiner.join(fts_parts)
 
     return result
 
@@ -216,6 +265,34 @@ def _tokenize(raw: str) -> List[str]:
     return tokens
 
 
+def _add_contains_clause(result: ParsedQuery, value: str, columns: Optional[List[str]] = None):
+    """검색단어포함 옵션용 LIKE 조건 추가."""
+    value = (value or "").strip()
+    if not value:
+        return
+    cols = columns or [
+        "subject", "sender_name", "sender_email", "recipients", "cc",
+        "body_text", "attachment_names", "categories"
+    ]
+    clause = "(" + " OR ".join(f"e.{c} LIKE ?" for c in cols) + ")"
+    result.where_clauses.append(clause)
+    result.where_params.extend([f"%{value}%"] * len(cols))
+
+
+def _looks_like_email(text: str) -> bool:
+    return bool(re.search(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]*", text or ""))
+
+
+def _apply_column_scope(term: str, search_columns: List[str]) -> str:
+    """일반 검색어를 지정된 FTS 컬럼으로 제한한다."""
+    if not search_columns:
+        return term
+    if len(search_columns) == 1:
+        return f"{search_columns[0]}:{term}"
+    # FTS5는 OR/괄호를 지원하므로 여러 컬럼 중 하나에 매칭되도록 묶는다.
+    return "(" + " OR ".join(f"{col}:{term}" for col in search_columns) + ")"
+
+
 def _escape_fts(text: str) -> str:
     """FTS5 특수문자 이스케이프"""
     if not text:
@@ -225,6 +302,14 @@ def _escape_fts(text: str) -> str:
     cleaned = re.sub(r'[^\w\s가-힣ㄱ-ㅎㅏ-ㅣ@.\-]', '', text, flags=re.UNICODE)
     return cleaned.strip()
 
+
+
+def _and_clause(clause: str) -> str:
+    """WHERE clause에 테이블 별칭을 안전하게 붙인다."""
+    stripped = clause.strip()
+    if stripped.startswith("(") or stripped.startswith("e."):
+        return f" AND {stripped}"
+    return f" AND e.{stripped}"
 
 def build_search_sql(parsed: ParsedQuery, page: int = 1, per_page: int = 20) -> Tuple[str, list]:
     """
@@ -252,7 +337,7 @@ def build_search_sql(parsed: ParsedQuery, page: int = 1, per_page: int = 20) -> 
         # 추가 WHERE 절
         if parsed.where_clauses:
             for clause in parsed.where_clauses:
-                sql += f" AND e.{clause}"
+                sql += _and_clause(clause)
             params.extend(parsed.where_params)
 
         # 정렬
@@ -273,7 +358,7 @@ def build_search_sql(parsed: ParsedQuery, page: int = 1, per_page: int = 20) -> 
 
         if parsed.where_clauses:
             for clause in parsed.where_clauses:
-                sql += f" AND e.{clause}"
+                sql += _and_clause(clause)
             params.extend(parsed.where_params)
 
         # 빈 검색 → 시간순
@@ -303,13 +388,13 @@ def build_count_sql(parsed: ParsedQuery) -> Tuple[str, list]:
         params.append(parsed.fts_query)
         if parsed.where_clauses:
             for clause in parsed.where_clauses:
-                sql += f" AND e.{clause}"
+                sql += _and_clause(clause)
             params.extend(parsed.where_params)
     else:
         sql = "SELECT COUNT(*) as cnt FROM emails e WHERE 1=1"
         if parsed.where_clauses:
             for clause in parsed.where_clauses:
-                sql += f" AND e.{clause}"
+                sql += _and_clause(clause)
             params.extend(parsed.where_params)
 
     return sql, params

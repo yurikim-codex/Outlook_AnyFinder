@@ -11,12 +11,16 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+WIN32_IMPORT_ERROR = None
 try:
     import win32com.client
     import pythoncom  # COM 스레드 초기화 필요
     HAS_WIN32 = True
-except ImportError:
+except Exception as e:
+    WIN32_IMPORT_ERROR = e
     HAS_WIN32 = False
+    win32com = None
+    pythoncom = None
 
 
 class OlDefaultFolders:
@@ -40,14 +44,19 @@ class OutlookConnector:
         self.outlook = None
         self.mapi = None
         self._connected = False
+        self._com_initialized = False
 
     def connect(self) -> bool:
         if not HAS_WIN32:
-            raise OutlookConnectionError("win32com 미설치")
+            raise OutlookConnectionError(
+                "Outlook COM 모듈(pywin32)을 사용할 수 없습니다. "
+                f"빌드/설치 환경에 pywin32가 포함되어 있는지 확인하세요. 원인: {WIN32_IMPORT_ERROR}"
+            )
 
         try:
             # ★ COM 스레드 초기화 (QThread에서 호출 시 필수)
             pythoncom.CoInitialize()
+            self._com_initialized = True
 
             self.outlook = win32com.client.Dispatch("Outlook.Application")
             self.mapi = self.outlook.GetNamespace("MAPI")
@@ -67,11 +76,26 @@ class OutlookConnector:
             return True
         except Exception as e:
             self._connected = False
-            raise OutlookConnectionError(f"Outlook 연결 실패: {e}")
+            raise OutlookConnectionError(
+                "Outlook 연결 실패: Microsoft Outlook 데스크톱(Classic Outlook)이 설치되어 있고 "
+                f"로그인되어 있는지 확인하세요. 새 Outlook(웹 기반)은 COM 연동을 지원하지 않을 수 있습니다. 상세: {e}"
+            )
 
     @property
     def is_connected(self):
         return self._connected
+
+    def close(self):
+        """COM 참조와 스레드 COM 초기화를 정리한다."""
+        self._connected = False
+        self.mapi = None
+        self.outlook = None
+        if HAS_WIN32 and self._com_initialized:
+            try:
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
+            self._com_initialized = False
 
     def get_default_folder(self, folder_id: int):
         if not self._connected:
@@ -127,65 +151,173 @@ class OutlookConnector:
                 logger.warning(f"폴더 목록 조회 실패 (ID={fid}): {e}")
         return folders
 
-    def get_total_mail_count(self, folder_ids=None, include_subfolders=True):
+    def _format_restrict_dates(self, after_date):
+        """Outlook Items.Restrict에 사용할 날짜 문자열 후보 생성.
+
+        Outlook Restrict는 ISO 문자열을 환경에 따라 제대로 처리하지 못할 수 있어
+        Outlook이 선호하는 US date format 후보를 같이 시도한다.
+        """
+        dt = self._to_datetime(after_date)
+        if not dt:
+            return [str(after_date)]
+        return [
+            dt.strftime("%m/%d/%Y %I:%M %p"),
+            dt.strftime("%m/%d/%Y %H:%M"),
+            dt.strftime("%Y-%m-%d %H:%M:%S"),
+        ]
+
+    def _restrict_items_after(self, items, field: str, after_date):
+        """날짜 조건으로 Items.Restrict를 시도하고 실패하면 None 반환."""
+        for date_text in self._format_restrict_dates(after_date):
+            try:
+                return items.Restrict(f"[{field}] >= '{date_text}'")
+            except Exception as e:
+                logger.debug(f"Restrict 실패 field={field}, date={date_text}: {e}")
+        return None
+
+    def get_total_mail_count(self, folder_ids=None, include_subfolders=True,
+                             after_date=None, incremental=False, mail_after_date=None):
         folder_ids = folder_ids or [OlDefaultFolders.INBOX, OlDefaultFolders.SENT]
         total = 0
         for fid in folder_ids:
             folder = self.get_default_folder(fid)
             if folder:
                 try:
-                    total += folder.Items.Count
+                    date_basis = "sent" if fid == OlDefaultFolders.SENT else "received"
+                    fname = OlDefaultFolders.NAMES.get(fid, getattr(folder, "Name", ""))
+                    total += self._count_items(folder, after_date=after_date, incremental=incremental, date_basis=date_basis, folder_name=fname, mail_after_date=mail_after_date)
                     if include_subfolders:
-                        total += self._count_subs(folder)
+                        total += self._count_subs(folder, after_date=after_date, incremental=incremental, date_basis=date_basis, mail_after_date=mail_after_date)
                 except Exception:
                     pass
         return total
 
-    def _count_subs(self, parent):
+    def _count_items(self, folder, after_date=None, incremental=False, date_basis="received", folder_name="", mail_after_date=None):
+        try:
+            items = folder.Items
+            need_exact = bool(mail_after_date)
+            if after_date:
+                field = "LastModificationTime" if incremental else ("SentOn" if date_basis == "sent" else "ReceivedTime")
+                restricted = self._restrict_items_after(items, field, after_date)
+                if restricted is not None:
+                    items = restricted
+                    if not need_exact:
+                        try:
+                            return items.Count
+                        except Exception:
+                            pass
+            elif mail_after_date:
+                # 기간 조건만 있는 경우에는 메일 날짜 기준으로 Restrict 시도
+                field = "SentOn" if date_basis == "sent" else "ReceivedTime"
+                restricted = self._restrict_items_after(items, field, mail_after_date)
+                if restricted is not None:
+                    items = restricted
+                    try:
+                        return items.Count
+                    except Exception:
+                        pass
+
+            # Restrict 실패 또는 증분+기간 교집합 카운트가 필요한 경우 정확히 직접 센다.
+            # 증분 동기화는 LastModificationTime 내림차순으로 정렬 후 기준일보다 오래된 항목에서 중단해
+            # 매번 폴더 전체를 끝까지 훑지 않도록 한다.
+            break_on_old_incremental = False
+            if after_date and incremental:
+                try:
+                    items.Sort("[LastModificationTime]", True)
+                    break_on_old_incremental = True
+                except Exception:
+                    pass
+            count = 0
+            for msg in items:
+                try:
+                    if msg.Class != 43:
+                        continue
+                    if after_date and incremental:
+                        mod_dt = self._to_datetime(getattr(msg, "LastModificationTime", None))
+                        base_dt = self._to_datetime(after_date)
+                        if mod_dt and base_dt and mod_dt < base_dt:
+                            if break_on_old_incremental:
+                                break
+                            continue
+                    elif after_date and not self._is_msg_after_date(msg, after_date, incremental=incremental, folder_name=folder_name, date_basis=date_basis):
+                        continue
+                    if mail_after_date and not self._is_msg_after_date(msg, mail_after_date, incremental=False, folder_name=folder_name, date_basis=date_basis):
+                        continue
+                    count += 1
+                except Exception:
+                    continue
+            return count
+        except Exception:
+            return 0
+
+    def _count_subs(self, parent, after_date=None, incremental=False, date_basis="received", mail_after_date=None):
         count = 0
         try:
             for i in range(1, parent.Folders.Count + 1):
                 sub = parent.Folders.Item(i)
-                count += sub.Items.Count
-                count += self._count_subs(sub)
+                count += self._count_items(sub, after_date=after_date, incremental=incremental, date_basis=date_basis, folder_name=getattr(sub, "Name", ""), mail_after_date=mail_after_date)
+                count += self._count_subs(sub, after_date=after_date, incremental=incremental, date_basis=date_basis, mail_after_date=mail_after_date)
         except Exception:
             pass
         return count
 
-    def iter_mails(self, folder_id, include_subfolders=True, after_date=None):
+    def iter_mails(self, folder_id, include_subfolders=True, after_date=None, incremental=False):
         folder = self.get_default_folder(folder_id)
         if not folder:
             logger.warning(f"폴더를 찾을 수 없음 (ID={folder_id})")
             return
 
         fname = OlDefaultFolders.NAMES.get(folder_id, folder.Name)
-        yield from self._iter_folder(folder, fname, after_date)
+        date_basis = "sent" if folder_id == OlDefaultFolders.SENT else "received"
+        yield from self._iter_folder(folder, fname, after_date, incremental=incremental, date_basis=date_basis)
         if include_subfolders:
-            yield from self._iter_subs(folder, after_date)
+            yield from self._iter_subs(folder, after_date, incremental=incremental, date_basis=date_basis)
 
-    def _iter_subs(self, parent, after_date=None):
+    def _iter_subs(self, parent, after_date=None, incremental=False, date_basis="received"):
         try:
             for i in range(1, parent.Folders.Count + 1):
                 sub = parent.Folders.Item(i)
-                yield from self._iter_folder(sub, sub.Name, after_date)
-                yield from self._iter_subs(sub, after_date)
+                yield from self._iter_folder(sub, sub.Name, after_date, incremental=incremental, date_basis=date_basis)
+                yield from self._iter_subs(sub, after_date, incremental=incremental, date_basis=date_basis)
         except Exception:
             pass
 
-    def _iter_folder(self, folder, fname, after_date=None):
+    def _iter_folder(self, folder, fname, after_date=None, incremental=False, date_basis="received"):
         try:
             items = folder.Items
             items.Sort("[ReceivedTime]", True)
 
+            break_on_old_incremental = False
             if after_date:
-                try:
-                    items = items.Restrict(f"[ReceivedTime] > '{after_date}'")
-                except Exception:
-                    pass
+                if incremental:
+                    # 증분 동기화: 변경/추가분만 확인
+                    field = "LastModificationTime"
+                else:
+                    # 기간 동기화: 받은편지함은 ReceivedTime, 보낸편지함은 SentOn 중심
+                    field = "SentOn" if date_basis == "sent" or fname in ("보낸편지함", "보낸 편지함", "Sent Items", "Sent") else "ReceivedTime"
+                restricted = self._restrict_items_after(items, field, after_date)
+                if restricted is not None:
+                    items = restricted
+                elif incremental:
+                    # Restrict 실패 시 전체를 끝까지 스캔하지 않도록 최신 수정일 순으로 정렬 후 오래된 항목에서 중단
+                    try:
+                        items.Sort("[LastModificationTime]", True)
+                        break_on_old_incremental = True
+                    except Exception:
+                        pass
 
             for msg in items:
                 try:
                     if msg.Class == 43:
+                        if after_date and incremental:
+                            mod_dt = self._to_datetime(getattr(msg, "LastModificationTime", None))
+                            base_dt = self._to_datetime(after_date)
+                            if mod_dt and base_dt and mod_dt < base_dt:
+                                if break_on_old_incremental:
+                                    break
+                                continue
+                        elif after_date and not self._is_msg_after_date(msg, after_date, incremental=incremental, folder_name=fname, date_basis=date_basis):
+                            continue
                         data = self._extract(msg, fname)
                         if data:
                             yield data
@@ -194,14 +326,63 @@ class OutlookConnector:
         except Exception as e:
             logger.error(f"폴더 '{fname}' 순회 오류: {e}")
 
+    def _to_datetime(self, value):
+        if not value:
+            return None
+        try:
+            if hasattr(value, "year") and hasattr(value, "month"):
+                return datetime(value.year, value.month, value.day, value.hour, value.minute, value.second)
+        except Exception:
+            pass
+        text = str(value)[:19]
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%m/%d/%y %H:%M:%S", "%m/%d/%Y %H:%M:%S"):
+            try:
+                return datetime.strptime(text, fmt)
+            except Exception:
+                continue
+        try:
+            return datetime.fromisoformat(text)
+        except Exception:
+            return None
+
+    def _is_msg_after_date(self, msg, after_date: str, incremental=False, folder_name="", date_basis="received") -> bool:
+        """증분은 LastModificationTime, 기간 필터는 ReceivedTime/SentOn 기준으로 판단."""
+        base_dt = self._to_datetime(after_date)
+        if not base_dt:
+            return True
+        if incremental:
+            attrs = ("LastModificationTime",)
+        elif date_basis == "sent" or folder_name in ("보낸편지함", "보낸 편지함", "Sent Items", "Sent"):
+            attrs = ("SentOn", "ReceivedTime")
+        else:
+            attrs = ("ReceivedTime", "SentOn")
+        for attr in attrs:
+            try:
+                dt = self._to_datetime(getattr(msg, attr, None))
+                if dt:
+                    return dt >= base_dt
+            except Exception:
+                continue
+        # 날짜를 확인할 수 없으면 누락 방지를 위해 포함
+        return True
+
     def _extract(self, msg, fname):
         try:
             att_names, att_types = [], set()
+            html_body = ""
+            try:
+                html_body = msg.HTMLBody or ""
+            except Exception:
+                html_body = ""
             try:
                 for i in range(1, msg.Attachments.Count + 1):
                     att = msg.Attachments.Item(i)
+                    if self._is_inline_or_signature_attachment(att, html_body):
+                        continue
                     name = att.FileName or ""
                     ext = os.path.splitext(name)[1].lower() if name else ""
+                    if not name:
+                        continue
                     att_names.append(name)
                     if ext: att_types.add(ext)
             except Exception:
@@ -229,22 +410,59 @@ class OutlookConnector:
                 "recipients": msg.To or "",
                 "cc": msg.CC or "",
                 "body_text": msg.Body or "",
-                "html_body": "",
+                "html_body": html_body,
                 "folder_name": fname,
                 "received_at": received,
                 "sent_at": sent,
-                "has_attachments": 1 if msg.Attachments.Count > 0 else 0,
-                "attachment_count": msg.Attachments.Count,
+                "has_attachments": 1 if att_names else 0,
+                "attachment_count": len(att_names),
                 "attachment_names": ", ".join(att_names),
                 "attachment_types": ", ".join(sorted(att_types)),
                 "importance": msg.Importance,
                 "is_read": 0 if msg.UnRead else 1,
                 "categories": msg.Categories or "",
                 "conversation_id": msg.ConversationID or "",
+                "last_modified": str(getattr(msg, "LastModificationTime", ""))[:19],
             }
         except Exception as e:
             logger.debug(f"메일 추출 실패: {e}")
             return None
+
+    def _is_inline_or_signature_attachment(self, att, html_body: str = "") -> bool:
+        """서명/본문 삽입 이미지처럼 실제 첨부가 아닌 항목을 제외한다.
+
+        Outlook은 서명 이미지/본문 삽입 이미지를 Attachments에 함께 노출하는 경우가 많다.
+        content-id, hidden 속성, HTML cid 참조 등을 이용해 첨부파일 목록에서 제외한다.
+        """
+        try:
+            name = (att.FileName or "").lower()
+            ext = os.path.splitext(name)[1].lower()
+            is_image = ext in {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
+            pa = getattr(att, "PropertyAccessor", None)
+            if pa:
+                def prop(dasl):
+                    try:
+                        return pa.GetProperty(dasl)
+                    except Exception:
+                        return None
+
+                hidden = prop("http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")
+                if hidden:
+                    return True
+                content_id = prop("http://schemas.microsoft.com/mapi/proptag/0x3712001F")
+                content_location = prop("http://schemas.microsoft.com/mapi/proptag/0x3713001F")
+                if is_image and (content_id or content_location):
+                    return True
+                if html_body and content_id and f"cid:{str(content_id).strip('<>')}".lower() in html_body.lower():
+                    return True
+            if is_image and html_body and name and name in html_body.lower():
+                return True
+            # Outlook 서명 이미지 기본 파일명 패턴
+            if is_image and name.startswith(("image00", "image0", "oledata")):
+                return True
+        except Exception:
+            return False
+        return False
 
     def _get_sender_email(self, msg):
         try:
@@ -287,6 +505,9 @@ class MockOutlookConnector:
     def is_connected(self):
         return self._connected
 
+    def close(self):
+        self._connected = False
+
     def get_default_folder(self, folder_id):
         return None  # Mock은 get_default_folder 미사용
 
@@ -298,10 +519,38 @@ class MockOutlookConnector:
             {"id": 3, "name": "지운편지함", "display_name": "지운 편지함", "count": 30},
         ]
 
-    def get_total_mail_count(self, folder_ids=None, include_subfolders=True):
+    def _format_restrict_dates(self, after_date):
+        """Outlook Items.Restrict에 사용할 날짜 문자열 후보 생성.
+
+        Outlook Restrict는 ISO 문자열을 환경에 따라 제대로 처리하지 못할 수 있어
+        Outlook이 선호하는 US date format 후보를 같이 시도한다.
+        """
+        dt = self._to_datetime(after_date)
+        if not dt:
+            return [str(after_date)]
+        return [
+            dt.strftime("%m/%d/%Y %I:%M %p"),
+            dt.strftime("%m/%d/%Y %H:%M"),
+            dt.strftime("%Y-%m-%d %H:%M:%S"),
+        ]
+
+    def _restrict_items_after(self, items, field: str, after_date):
+        """날짜 조건으로 Items.Restrict를 시도하고 실패하면 None 반환."""
+        for date_text in self._format_restrict_dates(after_date):
+            try:
+                return items.Restrict(f"[{field}] >= '{date_text}'")
+            except Exception as e:
+                logger.debug(f"Restrict 실패 field={field}, date={date_text}: {e}")
+        return None
+
+    def get_total_mail_count(self, folder_ids=None, include_subfolders=True,
+                             after_date=None, incremental=False, mail_after_date=None):
+        target_date = after_date or mail_after_date
+        if target_date:
+            return sum(1 for fid in (folder_ids or [6, 5]) for _ in self.iter_mails(fid, include_subfolders, after_date=target_date, incremental=incremental))
         return len(self._sample_emails)
 
-    def iter_mails(self, folder_id, include_subfolders=True, after_date=None):
+    def iter_mails(self, folder_id, include_subfolders=True, after_date=None, incremental=False):
         fname = OlDefaultFolders.NAMES.get(folder_id, "기타")
         for e in self._sample_emails:
             if e["folder_name"] == fname:
@@ -349,7 +598,7 @@ class MockOutlookConnector:
                 "received_at":dt.strftime("%Y-%m-%d %H:%M:%S"),"sent_at":(dt-timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S"),
                 "has_attachments":1 if has_att else 0,"attachment_count":len(atts),
                 "attachment_names":", ".join(a[0] for a in atts),"attachment_types":", ".join(set(a[1] for a in atts)),
-                "importance":2 if i<2 else 1,"is_read":0 if i==2 else 1,"categories":"","conversation_id":f"CONV_{i:04d}"})
+                "importance":2 if i<2 else 1,"is_read":0 if i==2 else 1,"categories":"","conversation_id":f"CONV_{i:04d}","last_modified":dt.strftime("%Y-%m-%d %H:%M:%S")})
 
         for i, (subj,body,has_att,atts) in enumerate(sent_data):
             r = senders[i % len(senders)]
@@ -359,11 +608,21 @@ class MockOutlookConnector:
                 "received_at":dt.strftime("%Y-%m-%d %H:%M:%S"),"sent_at":dt.strftime("%Y-%m-%d %H:%M:%S"),
                 "has_attachments":1 if has_att else 0,"attachment_count":len(atts),
                 "attachment_names":", ".join(a[0] for a in atts),"attachment_types":", ".join(set(a[1] for a in atts)),
-                "importance":1,"is_read":1,"categories":"","conversation_id":f"CONV_SENT_{i:04d}"})
+                "importance":1,"is_read":1,"categories":"","conversation_id":f"CONV_SENT_{i:04d}","last_modified":dt.strftime("%Y-%m-%d %H:%M:%S")})
         return samples
 
 
 def create_connector(use_mock=False):
-    if use_mock or not HAS_WIN32:
+    if use_mock:
+        logger.info("Mock 모드로 OutlookConnector 생성")
+        return MockOutlookConnector()
+    if not HAS_WIN32:
+        # Windows 배포본에서 조용히 Mock으로 전환되면 사용자가 실제 Outlook 동기화 실패를 알 수 없다.
+        # 따라서 Windows에서는 명시적으로 오류를 발생시켜 원인을 UI/로그에 표시한다.
+        if sys.platform == "win32":
+            raise OutlookConnectionError(
+                "pywin32/win32com 모듈이 없어 Outlook 동기화를 사용할 수 없습니다. "
+                f"원인: {WIN32_IMPORT_ERROR}"
+            )
         return MockOutlookConnector()
     return OutlookConnector()

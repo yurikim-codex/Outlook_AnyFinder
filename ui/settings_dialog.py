@@ -8,7 +8,8 @@ OutLook AnyFinder Ver0.9 for SESUNG Team
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QCheckBox, QComboBox, QSpinBox, QWidget, QFrame, QMessageBox,
-    QTabWidget, QGroupBox
+    QTabWidget, QGroupBox, QRadioButton, QButtonGroup, QProgressDialog,
+    QApplication
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QCursor
@@ -21,11 +22,14 @@ class SettingsDialog(QDialog):
     """설정 다이얼로그"""
 
     settings_saved = pyqtSignal(dict)  # 저장 시 변경된 설정 emit
+    data_reset = pyqtSignal()          # 데이터 초기화 완료 시 emit
 
     def __init__(self, db_conn=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"{APP_FULL_NAME} — 설정")
-        self.setFixedSize(520, 560)
+        # 탭이 늘어나도 메뉴가 잘리지 않도록 고정 크기 대신 가변 크기 사용
+        self.setMinimumSize(680, 640)
+        self.resize(760, 700)
         self.setStyleSheet(f"background-color:{Colors.BG_MAIN};")
 
         self.conn = db_conn
@@ -56,6 +60,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._tab_indexing(), "📧 인덱싱")
         tabs.addTab(self._tab_sync(), "🔄 동기화")
         tabs.addTab(self._tab_search(), "🔍 검색")
+        tabs.addTab(self._tab_theme(), "🎨 UI 테마")
         tabs.addTab(self._tab_data(), "💾 데이터")
 
         layout.addWidget(tabs, 1)
@@ -202,6 +207,55 @@ class SettingsDialog(QDialog):
         layout.addStretch()
         return w
 
+    def _tab_theme(self):
+        w = QWidget()
+        w.setStyleSheet("background:transparent;")
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(14)
+
+        layout.addWidget(self._section_label("UI 테마"))
+
+        self.theme_group = QButtonGroup(self)
+        self.theme_radios = {}
+
+        for key, title, desc in [
+            ("dark", "🌙 모던 다크 테마", "Slack 스타일의 심플한 사이드바와 Outlook 스타일 카드형 검색 리스트"),
+            ("light", "☀ 화이트 테마", "밝은 배경, 부드러운 색상 계층, 명확한 선택 상태"),
+        ]:
+            card = QWidget()
+            card.setStyleSheet(f"background:{Colors.BG_CARD};border:1px solid {Colors.BORDER};border-radius:{Radius.MD}px;")
+            cl = QVBoxLayout(card)
+            cl.setContentsMargins(14, 12, 14, 12)
+            cl.setSpacing(4)
+
+            rb = QRadioButton(title)
+            rb.setFont(QFont("Segoe UI", Fonts.SIZE_BASE, QFont.Weight.Bold))
+            rb.setStyleSheet(f"""
+                QRadioButton {{ color:{Colors.TEXT_PRIMARY}; spacing:8px; background:transparent; border:none; }}
+                QRadioButton::indicator {{ width:16px; height:16px; border:2px solid {Colors.TEXT_DIM}; border-radius:8px; background:transparent; }}
+                QRadioButton::indicator:checked {{ background-color:{Colors.PRIMARY}; border-color:{Colors.PRIMARY}; }}
+            """)
+            self.theme_group.addButton(rb)
+            self.theme_radios[key] = rb
+            cl.addWidget(rb)
+
+            info = QLabel(desc)
+            info.setWordWrap(True)
+            info.setFont(QFont("Segoe UI", Fonts.SIZE_SM))
+            info.setStyleSheet(f"color:{Colors.TEXT_DIM};background:transparent;border:none;padding-left:24px;")
+            cl.addWidget(info)
+            layout.addWidget(card)
+
+        note = QLabel("저장하면 선택한 테마가 즉시 적용됩니다. 일부 열린 설정창 스타일은 다음에 열 때 완전히 반영됩니다.")
+        note.setWordWrap(True)
+        note.setFont(QFont("Segoe UI", Fonts.SIZE_XS))
+        note.setStyleSheet(f"color:{Colors.TEXT_DIM};background:{Colors.ACCENT_BG};border:1px solid {Colors.ACCENT}30;border-radius:8px;padding:10px;")
+        layout.addWidget(note)
+
+        layout.addStretch()
+        return w
+
     def _tab_data(self):
         w = QWidget()
         w.setStyleSheet("background:transparent;")
@@ -269,6 +323,9 @@ class SettingsDialog(QDialog):
         sort_map = {"relevance": "관련도순", "newest": "최신순", "oldest": "오래된순"}
         self.default_sort_combo.setCurrentText(sort_map.get(search.get("default_sort", "relevance"), "관련도순"))
 
+        theme = self.config.get("ui", {}).get("theme", "dark")
+        self.theme_radios.get(theme, self.theme_radios["dark"]).setChecked(True)
+
     def _on_save(self):
         folder_ids = [fid for fid, cb in self.folder_checks.items() if cb.isChecked()]
         range_map = {"3개월": 3, "6개월": 6, "1년": 12, "전체": 0}
@@ -279,12 +336,14 @@ class SettingsDialog(QDialog):
         self.config["indexing"]["include_subfolders"] = self.subfolder_check.isChecked()
         self.config["indexing"]["range_months"] = range_map.get(self.range_combo.currentText(), 6)
 
-        self.config["sync"]["auto_sync"] = self.auto_sync_check.isChecked()
+        self.config["sync"]["auto_sync"] = self.auto_sync_check.isChecked() and self.interval_combo.currentText() != "수동만"
         self.config["sync"]["interval_minutes"] = interval_map.get(self.interval_combo.currentText(), 10)
 
         self.config["search"]["max_autocomplete_items"] = self.ac_max_spin.value()
         self.config["search"]["results_per_page"] = int(self.per_page_combo.currentText())
         self.config["search"]["default_sort"] = sort_map.get(self.default_sort_combo.currentText(), "relevance")
+
+        self.config.setdefault("ui", {})["theme"] = "light" if self.theme_radios["light"].isChecked() else "dark"
 
         save_config(self.config)
         self.settings_saved.emit(self.config)
@@ -316,44 +375,146 @@ class SettingsDialog(QDialog):
             self.db_info.setText(f"정보 조회 실패: {e}")
 
     def _clear_history(self):
-        reply = QMessageBox.question(self, "확인", "검색 히스토리를 모두 삭제하시겠습니까?")
+        reply = self._ask_yes_no(
+            "검색 히스토리 초기화",
+            "검색 히스토리를 모두 삭제하시겠습니까?",
+            yes_text="Yes  삭제",
+            no_text="No  취소",
+            danger=False,
+        )
         if reply == QMessageBox.StandardButton.Yes and self.conn:
-            self.conn.execute("DELETE FROM search_history")
-            self.conn.execute("DELETE FROM search_sessions")
-            self.conn.commit()
-            self._update_db_info()
+            progress = self._make_progress("검색 히스토리 초기화", "검색 히스토리 삭제 중...", 3)
+            try:
+                progress.setValue(1); QApplication.processEvents()
+                self.conn.execute("DELETE FROM search_history")
+                progress.setLabelText("검색 세션 기록 삭제 중..."); progress.setValue(2); QApplication.processEvents()
+                self.conn.execute("DELETE FROM search_sessions")
+                self.conn.commit()
+                progress.setValue(3); QApplication.processEvents()
+                self._update_db_info()
+                QMessageBox.information(self, "완료", "검색 히스토리가 초기화되었습니다.")
+            finally:
+                progress.close()
 
     def _rebuild_fts(self):
-        reply = QMessageBox.question(self, "확인", "검색 인덱스를 재구축하시겠습니까?\n(시간이 걸릴 수 있습니다)")
+        reply = self._ask_yes_no(
+            "검색 인덱스 재구축",
+            "검색 인덱스를 재구축하시겠습니까?\n메일 수에 따라 시간이 걸릴 수 있습니다.",
+            yes_text="Yes  재구축",
+            no_text="No  취소",
+            danger=False,
+        )
         if reply == QMessageBox.StandardButton.Yes and self.conn:
+            progress = self._make_progress("검색 인덱스 재구축", "FTS5 검색 인덱스 재구축 중...", 3)
             try:
+                progress.setValue(1); QApplication.processEvents()
                 self.conn.execute("INSERT INTO emails_fts(emails_fts) VALUES('rebuild')")
+                progress.setLabelText("DB 변경사항 저장 중..."); progress.setValue(2); QApplication.processEvents()
                 self.conn.commit()
+                progress.setValue(3); QApplication.processEvents()
                 QMessageBox.information(self, "완료", "검색 인덱스가 재구축되었습니다.")
             except Exception as e:
                 QMessageBox.warning(self, "오류", f"재구축 실패: {e}")
+            finally:
+                progress.close()
 
     def _reset_all_data(self):
-        reply = QMessageBox.warning(
-            self, "⚠ 경고",
+        reply = self._ask_yes_no(
+            "⚠ 데이터 초기화",
             "모든 인덱싱 데이터, 검색 히스토리, 북마크가 삭제됩니다.\n\n정말로 초기화하시겠습니까?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            yes_text="Yes  초기화",
+            no_text="No  취소",
         )
         if reply == QMessageBox.StandardButton.Yes and self.conn:
+            tables = ["emails", "email_hashes", "search_history", "bookmarks", "search_sessions", "related_keywords", "sync_meta"]
+            progress = self._make_progress("데이터 초기화", "초기화 준비 중...", len(tables) + 4)
             try:
-                for table in ["emails", "search_history", "bookmarks", "search_sessions", "related_keywords", "sync_meta"]:
+                step = 0
+                for table in tables:
+                    step += 1
+                    progress.setLabelText(f"{table} 테이블 초기화 중...")
+                    progress.setValue(step)
+                    QApplication.processEvents()
                     self.conn.execute(f"DELETE FROM {table}")
+                step += 1
+                progress.setLabelText("검색 인덱스 재구축 중...")
+                progress.setValue(step); QApplication.processEvents()
                 self.conn.execute("INSERT INTO emails_fts(emails_fts) VALUES('rebuild')")
+                step += 1
+                progress.setLabelText("DB 변경사항 저장 중...")
+                progress.setValue(step); QApplication.processEvents()
                 self.conn.commit()
+                step += 1
+                progress.setLabelText("설정 초기화 중...")
+                progress.setValue(step); QApplication.processEvents()
                 self.config["first_run_completed"] = False
                 save_config(self.config)
+                step += 1
+                progress.setLabelText("화면 갱신 중...")
+                progress.setValue(step); QApplication.processEvents()
                 self._update_db_info()
-                QMessageBox.information(self, "완료", "데이터가 초기화되었습니다.\n앱을 재시작하면 다시 인덱싱할 수 있습니다.")
+                self.data_reset.emit()
+                QMessageBox.information(self, "완료", "데이터가 초기화되었습니다.\n폴더 카운트와 검색 목록도 초기화했습니다.")
             except Exception as e:
                 QMessageBox.warning(self, "오류", f"초기화 실패: {e}")
+            finally:
+                progress.close()
 
     # ── 헬퍼 ──
+
+    def _make_progress(self, title: str, label: str, maximum: int):
+        progress = QProgressDialog(label, None, 0, maximum, self)
+        progress.setWindowTitle(title)
+        progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+        progress.setMinimumDuration(0)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.setStyleSheet(f"""
+            QProgressDialog {{ background:{Colors.BG_MAIN}; color:{Colors.TEXT_PRIMARY}; }}
+            QProgressBar {{ background:{Colors.BG_INPUT}; border:none; border-radius:5px; height:10px; }}
+            QProgressBar::chunk {{ background:{Colors.PRIMARY}; border-radius:5px; }}
+            QLabel {{ color:{Colors.TEXT_PRIMARY}; background:transparent; }}
+        """)
+        progress.show()
+        QApplication.processEvents()
+        return progress
+
+    def _ask_yes_no(self, title: str, text: str, yes_text="Yes", no_text="No", danger=True):
+        box = QMessageBox(self)
+        box.setWindowTitle(title)
+        box.setText(text)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        box.setDefaultButton(QMessageBox.StandardButton.No)
+        yes_btn = box.button(QMessageBox.StandardButton.Yes)
+        no_btn = box.button(QMessageBox.StandardButton.No)
+        if yes_btn:
+            yes_btn.setText(yes_text)
+        if no_btn:
+            no_btn.setText(no_text)
+        accent = Colors.DANGER if danger else Colors.PRIMARY
+        box.setStyleSheet(f"""
+            QMessageBox {{ background-color:{Colors.BG_MAIN}; color:{Colors.TEXT_PRIMARY}; }}
+            QMessageBox QLabel {{ color:{Colors.TEXT_PRIMARY}; background:transparent; font-size:{Fonts.SIZE_BASE}px; }}
+            QMessageBox QPushButton {{
+                min-width:122px; min-height:36px; padding:8px 20px;
+                margin-left:8px; margin-right:8px;
+                border-radius:14px; font-weight:700;
+                border:1px solid {Colors.BORDER_LIGHT};
+                background:{Colors.BG_CARD}; color:{Colors.TEXT_SECONDARY};
+            }}
+            QMessageBox QPushButton:hover {{
+                border:2px solid {Colors.PRIMARY};
+                background:{Colors.BG_CARD_HOVER}; color:{Colors.TEXT_PRIMARY};
+            }}
+            QMessageBox QPushButton:default {{
+                background:{accent}; color:#FFFFFF; border:1px solid {accent};
+            }}
+            QMessageBox QPushButton:default:hover {{
+                border:2px solid {accent};
+            }}
+        """)
+        return box.exec()
 
     def _section_label(self, text):
         lbl = QLabel(text)

@@ -1,74 +1,159 @@
 """
 OutLook AnyFinder Ver0.9 for SESUNG Team
-PyInstaller .exe 빌드 스크립트
+사내 배포용 .exe 빌드 스크립트
 
-사용법:
+권장 사용법:
     python build_exe.py
 
-결과:
-    dist/OutLookAnyFinder.exe  (단일 실행 파일)
+기본 결과:
+    release/OutLookAnyFinder_v0.9_YYYYMMDD_HHMM.zip
+
+옵션:
+    python build_exe.py --onefile   # 단일 exe 방식
 """
 
+import argparse
+import shutil
 import subprocess
 import sys
-import os
+from datetime import datetime
+from pathlib import Path
 
 
-def build():
-    print("=" * 60)
-    print("🔨 OutLook AnyFinder Ver0.9 — .exe 빌드")
-    print("=" * 60)
+ROOT = Path(__file__).resolve().parent
+VERSION = "0.9"
 
-    # PyInstaller 확인
+
+def run(cmd, **kwargs):
+    print(" ".join(str(c) for c in cmd))
+    subprocess.check_call(cmd, cwd=ROOT, **kwargs)
+
+
+def ensure_pip():
+    """현재 Python 실행환경에 pip가 없으면 ensurepip로 복구를 시도한다."""
     try:
-        import PyInstaller
-        print(f"✅ PyInstaller {PyInstaller.__version__}")
-    except ImportError:
-        print("📦 PyInstaller 설치 중...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "--version"],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return
+    except Exception:
+        print("⚠️ 현재 Python 환경에 pip가 없습니다. ensurepip 복구를 시도합니다...")
 
-    # 빌드 명령어
+    try:
+        run([sys.executable, "-m", "ensurepip", "--upgrade"])
+    except Exception as e:
+        raise SystemExit(
+            "\n❌ pip를 사용할 수 없습니다.\n"
+            f"현재 Python: {sys.executable}\n\n"
+            "해결 방법:\n"
+            "  1) PowerShell에서 py -3 --version 으로 일반 Python이 잡히는지 확인\n"
+            "  2) py -3 -m ensurepip --upgrade 실행\n"
+            "  3) py -3 build_exe.py 실행\n\n"
+            "또는 python.org에서 Python을 설치하고 'Add python.exe to PATH'를 체크하세요.\n"
+        ) from e
+
+
+def ensure_pyinstaller():
+    ensure_pip()
+    try:
+        import PyInstaller  # noqa
+        print(f"✅ PyInstaller {PyInstaller.__version__}")
+    except Exception:
+        print("📦 PyInstaller 설치 중...")
+        run([sys.executable, "-m", "pip", "install", "pyinstaller"])
+
+
+def ensure_requirements():
+    ensure_pip()
+    print("📦 requirements 설치/확인 중...")
+    run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+
+
+def clean():
+    for name in ["build", "dist"]:
+        p = ROOT / name
+        if p.exists():
+            shutil.rmtree(p)
+
+
+def build_onedir():
+    run([sys.executable, "-m", "PyInstaller", "--clean", "OutLookAnyFinder.spec"])
+    return ROOT / "dist" / "OutLookAnyFinder"
+
+
+def build_onefile():
     cmd = [
         sys.executable, "-m", "PyInstaller",
-        "--onefile",                          # 단일 .exe
-        "--windowed",                         # 콘솔 창 숨김
-        "--name", "OutLookAnyFinder",         # 실행 파일 이름
-        "--clean",                            # 캐시 정리
-        "--add-data", "ui;ui",                # UI 모듈 포함
-        "--add-data", "core;core",            # Core 모듈 포함
-        "--add-data", "data;data",            # Data 모듈 포함
-        "--add-data", "utils;utils",          # Utils 모듈 포함
-        "--add-data", "workers;workers",      # Workers 모듈 포함
-        "--hidden-import", "PyQt6",
-        "--hidden-import", "PyQt6.QtWidgets",
-        "--hidden-import", "PyQt6.QtCore",
-        "--hidden-import", "PyQt6.QtGui",
+        "--onefile",
+        "--windowed",
+        "--name", "OutLookAnyFinder",
+        "--clean",
+        "--version-file", "version_info.txt",
+        "--hidden-import", "pythoncom",
+        "--hidden-import", "pywintypes",
+        "--hidden-import", "win32timezone",
         "--hidden-import", "win32com",
         "--hidden-import", "win32com.client",
         "--hidden-import", "bs4",
-        # "--icon", "resources/icon.ico",     # 아이콘 (있을 경우)
-        "main.py"
+        "--collect-submodules", "win32com",
+        "--collect-data", "win32com",
+        "--collect-binaries", "pywin32_system32",
+        "main.py",
     ]
+    run(cmd)
+    return ROOT / "dist" / "OutLookAnyFinder.exe"
 
-    print(f"\n🚀 빌드 시작...\n")
 
-    result = subprocess.run(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
+def make_release(built_path: Path, onefile: bool):
+    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+    release_root = ROOT / "release"
+    package_dir = release_root / f"OutLookAnyFinder_v{VERSION}_{stamp}"
+    release_root.mkdir(exist_ok=True)
+    if package_dir.exists():
+        shutil.rmtree(package_dir)
+    package_dir.mkdir(parents=True)
 
-    if result.returncode == 0:
-        exe_path = os.path.join("dist", "OutLookAnyFinder.exe")
-        if os.path.exists(exe_path):
-            size_mb = os.path.getsize(exe_path) / (1024 * 1024)
-            print(f"\n{'=' * 60}")
-            print(f"✅ 빌드 성공!")
-            print(f"📁 파일: {exe_path}")
-            print(f"📦 크기: {size_mb:.1f}MB")
-            print(f"{'=' * 60}")
-        else:
-            print(f"\n✅ 빌드 완료 (dist/ 폴더 확인)")
+    if onefile:
+        shutil.copy2(built_path, package_dir / "OutLookAnyFinder.exe")
     else:
-        print(f"\n❌ 빌드 실패 (종료 코드: {result.returncode})")
-        print("  위의 에러 메시지를 확인하세요.")
+        shutil.copytree(built_path, package_dir / "OutLookAnyFinder")
+
+    docs = ROOT / "release_docs"
+    for doc in ["README_사내배포.txt", "실행_가이드.txt", "문제해결_가이드.txt", "배포담당자_체크리스트.txt"]:
+        shutil.copy2(docs / doc, package_dir / doc)
+
+    zip_base = release_root / package_dir.name
+    zip_path = shutil.make_archive(str(zip_base), "zip", package_dir)
+    return package_dir, Path(zip_path)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--onefile", action="store_true", help="단일 exe로 빌드")
+    args = parser.parse_args()
+
+    print("=" * 70)
+    print("🔨 OutLook AnyFinder 사내 배포 패키지 빌드")
+    print("=" * 70)
+
+    ensure_pyinstaller()
+    ensure_requirements()
+    clean()
+
+    built = build_onefile() if args.onefile else build_onedir()
+    if not built.exists():
+        raise SystemExit(f"❌ 빌드 결과를 찾을 수 없습니다: {built}")
+
+    package_dir, zip_path = make_release(built, args.onefile)
+    print("=" * 70)
+    print("✅ 배포 패키지 생성 완료")
+    print(f"📁 폴더: {package_dir}")
+    print(f"📦 ZIP : {zip_path}")
+    print("=" * 70)
 
 
 if __name__ == "__main__":
-    build()
+    main()

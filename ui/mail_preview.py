@@ -74,12 +74,6 @@ class MailPreview(QWidget):
         self.btn_outlook.clicked.connect(lambda: self.open_in_outlook.emit(self.current_entry_id))
         action_row.addWidget(self.btn_outlook)
 
-        self.btn_reply = self._action_btn("↩ 답장", Colors.TEXT_DIM)
-        action_row.addWidget(self.btn_reply)
-
-        self.btn_forward = self._action_btn("↗ 전달", Colors.TEXT_DIM)
-        action_row.addWidget(self.btn_forward)
-
         action_row.addStretch()
         layout.addLayout(action_row)
 
@@ -120,8 +114,10 @@ class MailPreview(QWidget):
         self.body_edit.setPlainText(e.body_text or "(본문 없음)")
 
         self.btn_outlook.setEnabled(True)
-        self.btn_reply.setEnabled(True)
-        self.btn_forward.setEnabled(True)
+
+    def clear(self):
+        self.current_entry_id = ""
+        self._show_placeholder()
 
     def _show_placeholder(self):
         self.subject_label.setText("📧 메일을 선택하세요")
@@ -131,8 +127,6 @@ class MailPreview(QWidget):
         self.meta_att.hide()
         self.body_edit.setPlainText("")
         self.btn_outlook.setEnabled(False)
-        self.btn_reply.setEnabled(False)
-        self.btn_forward.setEnabled(False)
 
     def _sep(self):
         f = QFrame()

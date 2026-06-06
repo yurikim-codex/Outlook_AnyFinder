@@ -243,7 +243,7 @@ class IndexingDialog(QDialog):
         self.stop_btn.hide()
         self.bg_btn.hide()
 
-        close_btn = QPushButton("✅ 검색 시작하기")
+        close_btn = QPushButton("✅ 닫기")
         close_btn.setFixedHeight(42)
         close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         close_btn.setStyleSheet(f"QPushButton{{background:{Colors.SUCCESS};color:#FFF;border:none;border-radius:8px;padding:8px 24px;font-size:{Fonts.SIZE_BASE}px;font-weight:bold;}}QPushButton:hover{{background:#34D399;}}")

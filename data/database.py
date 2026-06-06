@@ -5,6 +5,7 @@ OutLook AnyFinder Ver0.9 for SESUNG Team
 
 import sqlite3
 import os
+import time
 from pathlib import Path
 
 DATA_DIR = Path.home() / ".outlook_anyfinder"
@@ -21,8 +22,9 @@ def get_connection(db_path: Path = None) -> sqlite3.Connection:
     if db_path is None:
         db_path = get_db_path()
 
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -175,8 +177,15 @@ def get_meta(conn, key, default=None):
     return row["value"] if row else default
 
 def set_meta(conn, key, value):
-    conn.execute("INSERT INTO sync_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=?", (key, value, value))
-    conn.commit()
+    for attempt in range(5):
+        try:
+            conn.execute("INSERT INTO sync_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=?", (key, value, value))
+            conn.commit()
+            return
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e).lower() or attempt == 4:
+                raise
+            time.sleep(0.3 * (attempt + 1))
 
 def get_setting(conn, key, default=None):
     row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
@@ -213,3 +222,37 @@ def cleanup_session_logs(conn, max_rows=1000):
         )
     """)
     conn.commit()
+
+
+def clear_search_records(conn):
+    """검색 기록을 초기화한다. 북마크는 유지한다."""
+    conn.execute("DELETE FROM search_history")
+    conn.execute("DELETE FROM search_sessions")
+    conn.execute("DELETE FROM related_keywords")
+    conn.commit()
+
+
+def get_mock_email_count(conn) -> int:
+    """Mock/Demo 메일 개수 반환."""
+    try:
+        row = conn.execute("SELECT COUNT(*) as cnt FROM emails WHERE entry_id LIKE 'MOCK_%'").fetchone()
+        return row["cnt"] if row else 0
+    except Exception:
+        return 0
+
+
+def purge_mock_data(conn) -> int:
+    """실제 Outlook 동기화를 방해할 수 있는 Mock/Demo 메일과 해시를 삭제한다."""
+    mock_count = get_mock_email_count(conn)
+    if mock_count <= 0:
+        return 0
+    conn.execute("DELETE FROM emails WHERE entry_id LIKE 'MOCK_%'")
+    conn.execute("DELETE FROM email_hashes WHERE entry_id LIKE 'MOCK_%'")
+    # Mock 인덱싱 때 저장된 동기화 메타가 있으면 실제 Outlook 증분 동기화를 방해할 수 있다.
+    conn.execute("DELETE FROM sync_meta WHERE key IN ('last_sync_time', 'total_indexed', 'indexing_state')")
+    try:
+        conn.execute("INSERT INTO emails_fts(emails_fts) VALUES('rebuild')")
+    except Exception:
+        pass
+    conn.commit()
+    return mock_count

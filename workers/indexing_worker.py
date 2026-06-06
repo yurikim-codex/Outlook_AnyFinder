@@ -22,13 +22,14 @@ class IndexingWorker(QThread):
 
     def __init__(self, db_path, use_mock: bool, folder_ids: List[int] = None,
                  include_subfolders: bool = True, is_first_run: bool = False,
-                 parent=None):
+                 after_date=None, parent=None):
         super().__init__(parent)
         self.db_path = db_path          # DB 경로 (스레드 내에서 새 연결 생성)
         self.use_mock = use_mock        # Mock 여부
         self.folder_ids = folder_ids or [6, 5]
         self.include_subfolders = include_subfolders
         self.is_first_run = is_first_run
+        self.after_date = after_date
 
         self._stop_flag = False
         self._paused = False
@@ -56,6 +57,8 @@ class IndexingWorker(QThread):
 
     def run(self):
         """스레드 내에서 DB 연결 + COM 연결을 새로 생성"""
+        conn = None
+        connector = None
         try:
             self.status_changed.emit("running")
 
@@ -74,12 +77,23 @@ class IndexingWorker(QThread):
                 self._do_smart_sync(conn, connector)
 
             conn.close()
+            conn = None
 
         except Exception as e:
             error_msg = f"인덱싱 오류: {e}"
             logger.error(error_msg, exc_info=True)
             self.error_occurred.emit(error_msg)
         finally:
+            try:
+                if connector and hasattr(connector, "close"):
+                    connector.close()
+            except Exception:
+                pass
+            try:
+                if conn:
+                    conn.close()
+            except Exception:
+                pass
             if not self._stop_flag:
                 self.status_changed.emit("completed")
 
@@ -150,7 +164,9 @@ class IndexingWorker(QThread):
         try:
             total_count = connector.get_total_mail_count(
                 folder_ids=self.folder_ids,
-                include_subfolders=self.include_subfolders
+                include_subfolders=self.include_subfolders,
+                after_date=self.after_date,
+                incremental=False,
             )
         except Exception:
             pass
@@ -169,7 +185,12 @@ class IndexingWorker(QThread):
             fname = OlDefaultFolders.NAMES.get(fid, f"폴더{fid}")
 
             try:
-                mail_iter = connector.iter_mails(fid, include_subfolders=self.include_subfolders)
+                mail_iter = connector.iter_mails(
+                    fid,
+                    include_subfolders=self.include_subfolders,
+                    after_date=self.after_date,
+                    incremental=False,
+                )
 
                 def on_progress(done, total, subject):
                     nonlocal overall_done

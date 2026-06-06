@@ -60,7 +60,10 @@ class SearchEngine:
 
     def search(self, query: str, page: int = 1, per_page: int = 20,
                sort_by: str = "rank",
-               extra_where: List[Tuple[str, list]] = None) -> SearchResponse:
+               extra_where: List[Tuple[str, list]] = None,
+               search_columns: List[str] = None,
+               match_operator: str = "AND",
+               contains_search: bool = False) -> SearchResponse:
         """
         메일 검색 실행
 
@@ -70,6 +73,8 @@ class SearchEngine:
             per_page: 페이지당 결과 수
             sort_by: "rank" | "received_at_desc" | "received_at_asc"
             extra_where: 추가 WHERE 절 [(clause, [params]), ...]
+            search_columns: 일반 키워드를 검색할 FTS 컬럼 목록. None이면 전체 검색
+            match_operator: 토큰 결합 방식("AND" 또는 "OR")
 
         Returns:
             SearchResponse
@@ -77,7 +82,12 @@ class SearchEngine:
         start = time.perf_counter()
 
         # 1. 쿼리 파싱
-        parsed = parse_query(query)
+        parsed = parse_query(
+            query,
+            search_columns=search_columns,
+            match_operator=match_operator,
+            contains_search=contains_search,
+        )
         parsed.sort_by = sort_by
 
         # 추가 필터 (UI 필터 칩에서 전달)
@@ -132,10 +142,15 @@ class SearchEngine:
         )
 
     def search_all(self, query: str, sort_by: str = "rank",
-                    extra_where: List[Tuple[str, list]] = None) -> SearchResponse:
+                    extra_where: List[Tuple[str, list]] = None,
+                    search_columns: List[str] = None,
+                    match_operator: str = "AND",
+                    contains_search: bool = False) -> SearchResponse:
         """전체 결과 반환 (페이지네이션 없음, 최대 1000건)"""
         return self.search(query, page=1, per_page=1000, sort_by=sort_by,
-                          extra_where=extra_where)
+                          extra_where=extra_where, search_columns=search_columns,
+                          match_operator=match_operator,
+                          contains_search=contains_search)
 
     def get_total_count(self) -> int:
         """전체 인덱싱된 메일 수"""

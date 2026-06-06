@@ -15,14 +15,18 @@ class SyncWorker(QThread):
     sync_error = pyqtSignal(str)
 
     def __init__(self, db_path, use_mock: bool, folder_ids=None,
-                 include_subfolders=True, parent=None):
+                 include_subfolders=True, after_date=None, incremental=False, parent=None):
         super().__init__(parent)
         self.db_path = db_path
         self.use_mock = use_mock
         self.folder_ids = folder_ids or [6, 5]
         self.include_subfolders = include_subfolders
+        self.after_date = after_date
+        self.incremental = incremental
 
     def run(self):
+        conn = None
+        connector = None
         try:
             # ★ 스레드 내에서 새 DB 연결
             from data.database import init_db
@@ -47,6 +51,9 @@ class SyncWorker(QThread):
                 folder_ids=self.folder_ids,
                 include_subfolders=self.include_subfolders,
                 on_status=lambda msg: self.sync_progress.emit(0, 0, msg),
+                after_date=self.after_date,
+                incremental=self.incremental,
+                on_scan_progress=lambda d, t, m, f: self.sync_progress.emit(d, t, m),
             )
 
             if not plan.has_changes:
@@ -62,6 +69,8 @@ class SyncWorker(QThread):
                 plan, folder_ids=self.folder_ids,
                 include_subfolders=self.include_subfolders,
                 on_progress=lambda d, t, m: self.sync_progress.emit(d, t, m),
+                after_date=self.after_date,
+                incremental=self.incremental,
             )
 
             self.sync_finished.emit({
@@ -72,7 +81,19 @@ class SyncWorker(QThread):
             })
 
             conn.close()
+            conn = None
 
         except Exception as e:
             logger.error(f"동기화 오류: {e}", exc_info=True)
             self.sync_error.emit(str(e))
+        finally:
+            try:
+                if connector and hasattr(connector, "close"):
+                    connector.close()
+            except Exception:
+                pass
+            try:
+                if conn:
+                    conn.close()
+            except Exception:
+                pass

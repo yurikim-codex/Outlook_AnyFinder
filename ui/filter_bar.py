@@ -71,9 +71,9 @@ class FilterChip(QPushButton):
 
     def _apply(self):
         if self._active:
-            self.setStyleSheet(f"QPushButton{{background:{Colors.PRIMARY};color:#FFF;border:none;border-radius:6px;padding:4px 12px;font-weight:bold;}}")
+            self.setStyleSheet(f"QPushButton{{background:{Colors.PRIMARY_BG};color:{Colors.PRIMARY_HOVER};border:1px solid {Colors.PRIMARY}70;border-radius:8px;padding:4px 12px;font-weight:bold;}}QPushButton:hover{{border:1px solid {Colors.PRIMARY};}}")
         else:
-            self.setStyleSheet(f"QPushButton{{background:{Colors.BG_CARD};color:{Colors.TEXT_SECONDARY};border:1px solid {Colors.BORDER};border-radius:6px;padding:4px 12px;}}QPushButton:hover{{background:{Colors.BG_CARD_HOVER};color:{Colors.TEXT_PRIMARY};}}")
+            self.setStyleSheet(f"QPushButton{{background:{Colors.BG_CARD};color:{Colors.TEXT_SECONDARY};border:1px solid {Colors.BORDER};border-radius:8px;padding:4px 12px;}}QPushButton:hover{{background:{Colors.BG_CARD_HOVER};color:{Colors.TEXT_PRIMARY};border:1px solid {Colors.BORDER_LIGHT};}}")
 
 
 class DynamicAttachmentFilter(QPushButton):
@@ -175,8 +175,8 @@ class DynamicAttachmentFilter(QPushButton):
 
     def _style(self, active):
         if active:
-            return f"QPushButton{{background:{Colors.PRIMARY}30;color:{Colors.PRIMARY_HOVER};border:1px solid {Colors.PRIMARY}60;border-radius:6px;padding:4px 10px;font-weight:bold;}}"
-        return f"QPushButton{{background:{Colors.BG_CARD};color:{Colors.TEXT_SECONDARY};border:1px solid {Colors.BORDER};border-radius:6px;padding:4px 10px;}}QPushButton:hover{{background:{Colors.BG_CARD_HOVER};}}"
+            return f"QPushButton{{background:{Colors.PRIMARY_BG};color:{Colors.PRIMARY_HOVER};border:1px solid {Colors.PRIMARY}60;border-radius:8px;padding:4px 10px;font-weight:bold;}}QPushButton:hover{{border:1px solid {Colors.PRIMARY};}}"
+        return f"QPushButton{{background:{Colors.BG_CARD};color:{Colors.TEXT_SECONDARY};border:1px solid {Colors.BORDER};border-radius:8px;padding:4px 10px;}}QPushButton:hover{{background:{Colors.BG_CARD_HOVER};border:1px solid {Colors.BORDER_LIGHT};}}"
 
 
 class FilterBar(QWidget):
@@ -197,7 +197,7 @@ class FilterBar(QWidget):
         row1.setSpacing(5)
 
         self.chips = {}
-        for key, label in [("all", "전체"), ("inbox", "받은편지함"), ("sent", "보낸편지함"), ("unread", "읽지 않음")]:
+        for key, label in [("all", "전체"), ("inbox", "받은편지함"), ("sent", "보낸편지함")]:
             chip = FilterChip(label, key)
             chip.toggled_state.connect(self._on_chip)
             self.chips[key] = chip
@@ -295,6 +295,9 @@ class FilterBar(QWidget):
         if not state: return
         for k, v in state.get("chips", {}).items():
             if k in self.chips: self.chips[k].set_active(v)
+        # 과거 저장 상태에서 받은편지함/보낸편지함이 동시에 켜져 있으면 받은편지함 우선
+        if self.chips.get("inbox") and self.chips.get("sent") and self.chips["inbox"].is_active and self.chips["sent"].is_active:
+            self.chips["sent"].set_active(False)
         idx = self.date_combo.findText(state.get("date", "전체 기간"))
         if idx >= 0: self.date_combo.setCurrentIndex(idx)
         idx = self.sort_combo.findText(state.get("sort", "최신순"))
@@ -312,9 +315,19 @@ class FilterBar(QWidget):
     def _on_chip(self, key, active):
         if key == "all" and active:
             for k, c in self.chips.items():
-                if k != "all": c.set_active(False)
+                if k != "all":
+                    c.set_active(False)
         elif key != "all" and active:
             self.chips["all"].set_active(False)
+            # 받은편지함/보낸편지함은 전체 리스트에서 동시에 의미가 없으므로 상호 배타 처리
+            if key == "inbox" and "sent" in self.chips:
+                self.chips["sent"].set_active(False)
+            elif key == "sent" and "inbox" in self.chips:
+                self.chips["inbox"].set_active(False)
+        elif key != "all" and not active:
+            # 폴더 필터가 모두 꺼지면 전체로 복귀
+            if not any(c.is_active for k, c in self.chips.items() if k != "all"):
+                self.chips["all"].set_active(True)
         self._update_tags()
         self.filter_changed.emit()
 

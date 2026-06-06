@@ -9,9 +9,10 @@ OutLook AnyFinder Ver0.9 for SESUNG Team
 
 import os
 import re
+import html
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation, QVariant
-from PyQt6.QtGui import QFont, QCursor, QColor
+from PyQt6.QtGui import QFont, QCursor, QColor, QFontMetrics
 
 from ui.theme import Colors, Fonts, Radius
 from data.models import SearchResult
@@ -52,6 +53,46 @@ def _get_ext_icon(ext: str) -> str:
     return EXT_ICONS.get(ext.lower(), "📎")
 
 
+class ElidedHighlightLabel(QLabel):
+    """가로 폭에 맞춰 텍스트를 말줄임하고 검색어를 하이라이트하는 라벨."""
+
+    def __init__(self, text: str = "", search_term: str = "", parent=None):
+        super().__init__(parent)
+        self._full_text = text or ""
+        self._search_term = search_term or ""
+        self.setTextFormat(Qt.TextFormat.RichText)
+        self.setWordWrap(False)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self._refresh()
+
+    def set_full_text(self, text: str, search_term: str = None):
+        self._full_text = text or ""
+        if search_term is not None:
+            self._search_term = search_term or ""
+        self._refresh()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._refresh()
+
+    def _refresh(self):
+        width = max(40, self.width() - 6)
+        fm = QFontMetrics(self.font())
+        elided = fm.elidedText(self._full_text.replace("\n", " "), Qt.TextElideMode.ElideRight, width)
+        self.setText(self._highlight_html(elided))
+
+    def _highlight_html(self, text: str) -> str:
+        safe = html.escape(text)
+        for term in re.split(r"[\s+]+", self._search_term):
+            if term and len(term) >= 2:
+                pattern = re.compile(re.escape(html.escape(term)), re.IGNORECASE)
+                safe = pattern.sub(
+                    lambda m: f'<span style="background:{Colors.HIGHLIGHT_BG};color:{Colors.HIGHLIGHT_TEXT};padding:0 2px;border-radius:2px;">{m.group()}</span>',
+                    safe
+                )
+        return safe
+
+
 def _get_ext_color(ext: str) -> str:
     """확장자에 맞는 색상 (동적 해시 기반)"""
     preset = {
@@ -82,9 +123,10 @@ class MailCard(QWidget):
         self._blink_labels = []  # 점멸 대상 라벨들
         self._blink_state = False
         self._blink_timer = None
+        self.setObjectName("mailCard")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.setMinimumHeight(80)
-        self.setMaximumHeight(140)
+        self.setFixedHeight(132)
         self._build()
         self._apply_style()
         self._start_blink_if_needed()
@@ -132,42 +174,49 @@ class MailCard(QWidget):
 
         layout.addLayout(r1)
 
-        # ── Row 2: 제목 (날짜 다음 줄)
-        subj_text = self._highlight_text(e.subject or "(제목 없음)")
-        subj = QLabel(subj_text)
+        # ── Row 2: 제목 (날짜 다음 줄) — 카드 폭에 맞춰 말줄임
+        subj = ElidedHighlightLabel(e.subject or "(제목 없음)", self.search_term)
         subj.setFont(QFont("Segoe UI", Fonts.SIZE_SM, QFont.Weight.Bold))
         subj.setStyleSheet(f"color:{Colors.TEXT_PRIMARY};background:transparent;border:none;")
-        subj.setTextFormat(Qt.TextFormat.RichText)
+        subj.setFixedHeight(20)
         layout.addWidget(subj)
 
         # ── Row 3: 발신자 → 수신자
         sender_txt = f"👤 {e.sender_name}"
         if e.recipients:
             sender_txt += f" → {e.recipients}"
-        sl = QLabel(sender_txt)
+        sl = ElidedHighlightLabel(sender_txt, self.search_term)
         sl.setFont(QFont("Segoe UI", Fonts.SIZE_XS))
         sl.setStyleSheet(f"color:{Colors.TEXT_SECONDARY};background:transparent;border:none;")
+        sl.setFixedHeight(18)
         layout.addWidget(sl)
 
         # ── Row 4: 첨부파일 (확장자 아이콘 + 검색어 매칭 시 점멸)
         if e.has_attachments and e.attachment_names:
             r4 = QHBoxLayout()
-            r4.setSpacing(3)
-            for name in e.attachment_names.split(", ")[:4]:
+            r4.setSpacing(4)
+            names = [n for n in e.attachment_names.split(", ") if n.strip()]
+            for name in names[:3]:
                 ext = os.path.splitext(name)[1].lower()
-                icon = _get_ext_icon(ext)
                 color = _get_ext_color(ext)
 
-                al = QLabel(f"{icon} {name}")
+                # 첨부파일은 확장자 아이콘 대신 clip(📎) 표시로 구분
+                al = ElidedHighlightLabel(f"📎 {name}", self.search_term)
                 al.setFont(QFont("Segoe UI", 9))
-                al.setStyleSheet(f"background:{color}12;color:{color};border:1px solid {color}30;border-radius:3px;padding:0px 4px;")
-                al.setFixedHeight(16)
+                al.setStyleSheet(f"background:{color}10;color:{color};border:1px solid {color}35;border-radius:5px;padding:0px 5px;")
+                al.setFixedHeight(18)
+                al.setMaximumWidth(150)
 
-                # ★ 검색어와 첨부파일명 매칭 시 점멸 대상 등록
                 if self._matches_search(name):
                     self._blink_labels.append((al, color))
 
                 r4.addWidget(al)
+            if len(names) > 3:
+                more = QLabel(f"📎 +{len(names) - 3}")
+                more.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+                more.setStyleSheet(f"background:{Colors.BG_INPUT};color:{Colors.TEXT_DIM};border:1px solid {Colors.BORDER};border-radius:5px;padding:0px 5px;")
+                more.setFixedHeight(18)
+                r4.addWidget(more)
             r4.addStretch()
             layout.addLayout(r4)
 
@@ -177,13 +226,12 @@ class MailCard(QWidget):
         snippet = snippet_src.replace("\n", " ").strip()
         if len(snippet) > 90:
             snippet = snippet[:90] + "..."
-        if not self.result.body_snippet:
-            snippet = self._highlight_text(snippet)
-        sn = QLabel(snippet)
+        # snippet도 높이는 고정하고, 가로 폭에 맞춰 말줄임
+        snippet_plain = re.sub(r"<[^>]+>", "", snippet)
+        sn = ElidedHighlightLabel(snippet_plain, self.search_term)
         sn.setFont(QFont("Segoe UI", Fonts.SIZE_XS))
         sn.setStyleSheet(f"color:{Colors.TEXT_DIM};background:transparent;border:none;")
-        sn.setTextFormat(Qt.TextFormat.RichText)
-        sn.setWordWrap(True)
+        sn.setFixedHeight(20)
         r5.addWidget(sn, 1)
 
         if self.result.rank_score > 0:
@@ -197,7 +245,7 @@ class MailCard(QWidget):
         if not self.search_term:
             return False
         name_lower = filename.lower()
-        for term in self.search_term.split():
+        for term in re.split(r"[\s+]+", self.search_term):
             if term and len(term) >= 2 and term.lower() in name_lower:
                 return True
         return False
@@ -223,7 +271,7 @@ class MailCard(QWidget):
     def _highlight_text(self, text):
         if not self.search_term or not text:
             return text
-        for term in self.search_term.split():
+        for term in re.split(r"[\s+]+", self.search_term):
             if term and len(term) >= 2 and term.lower() in text.lower():
                 pattern = re.compile(re.escape(term), re.IGNORECASE)
                 text = pattern.sub(
@@ -247,9 +295,27 @@ class MailCard(QWidget):
     def _apply_style(self):
         # ★ 사각 라운드 외곽선 추가
         if self._selected:
-            self.setStyleSheet(f"MailCard{{background:{Colors.PRIMARY_BG};border:2px solid {Colors.PRIMARY};border-radius:{Radius.MD}px;}}")
+            self.setStyleSheet(f"""
+                QWidget#mailCard {{
+                    background:{Colors.PRIMARY_BG};
+                    border:2px solid {Colors.PRIMARY};
+                    border-radius:{Radius.LG}px;
+                    margin:3px;
+                }}
+            """)
         else:
-            self.setStyleSheet(f"MailCard{{background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_LIGHT};border-radius:{Radius.MD}px;}}MailCard:hover{{background:{Colors.BG_CARD_HOVER};border:1px solid {Colors.PRIMARY}40;}}")
+            self.setStyleSheet(f"""
+                QWidget#mailCard {{
+                    background:{Colors.BG_CARD};
+                    border:1px solid {Colors.BORDER};
+                    border-radius:{Radius.LG}px;
+                    margin:3px;
+                }}
+                QWidget#mailCard:hover {{
+                    background:{Colors.BG_CARD_HOVER};
+                    border:1px solid {Colors.PRIMARY}80;
+                }}
+            """)
 
     def mousePressEvent(self, event):
         self.clicked.emit(self.result)
