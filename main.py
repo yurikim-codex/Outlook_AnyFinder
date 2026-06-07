@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 앱 진입점 (v8 — 인덱싱 항상 사용자 승인 필요)
 
 흐름:
@@ -315,15 +315,10 @@ class AppController:
 
     def _get_selected_folder_counts(self, folder_ids):
         """선택 폴더별 실제 Outlook 인덱싱 데이터 수를 별칭 포함해 계산."""
-        aliases = {
-            6: ["받은편지함", "받은 편지함", "Inbox"],
-            5: ["보낸편지함", "보낸 편지함", "Sent Items", "Sent"],
-            16: ["임시보관함", "임시 보관함", "Drafts"],
-            3: ["지운편지함", "지운 편지함", "Deleted Items", "Trash"],
-        }
+        from data.database import get_folder_aliases
         result = {}
         for fid in folder_ids:
-            names = aliases.get(fid, [])
+            names = get_folder_aliases(fid)
             if not names:
                 result[fid] = 0
                 continue
@@ -465,12 +460,12 @@ class AppController:
                 font-size: 13px;
             }}
             QMessageBox QPushButton {{
-                min-width: 112px;
-                min-height: 34px;
-                padding: 7px 18px;
-                border-radius: 12px;
+                min-width: 150px;
+                min-height: 38px;
+                padding: 8px 24px;
+                border-radius: 10px;
                 font-weight: 700;
-                border: 1px solid {Colors.BORDER_LIGHT};
+                border: 2px solid {Colors.BORDER_LIGHT};
                 background: {Colors.BG_CARD};
                 color: {Colors.TEXT_SECONDARY};
             }}
@@ -482,7 +477,7 @@ class AppController:
             QMessageBox QPushButton:default {{
                 background: {Colors.PRIMARY};
                 color: #FFFFFF;
-                border: 1px solid {Colors.PRIMARY};
+                border: 2px solid {Colors.PRIMARY};
             }}
             QMessageBox QPushButton:default:hover {{
                 background: {Colors.PRIMARY_HOVER};

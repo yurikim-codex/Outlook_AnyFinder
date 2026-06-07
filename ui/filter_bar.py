@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [U04] 필터 바 (v2 — 동적 확장자 필터 + '첨부 없음' + 자동 색상)
 """
 

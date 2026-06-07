@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 CLI 기능 검증 — GUI 없이 핵심 로직 전체 테스트
 
 이 스크립트는 GUI(PyQt6) 없이도 실행 가능하며,
@@ -49,7 +49,7 @@ def print_info(msg):
 
 
 def main():
-    print_header("📧 OutLook AnyFinder Ver0.9 for SESUNG Team — CLI 기능 검증")
+    print_header("📧 OutLook AnyFinder Ver0.9.1.1 for SESUNG Team — CLI 기능 검증")
 
     # ═══ 1. DB 초기화 ═══
     print_header("1. DB 초기화")
@@ -304,7 +304,7 @@ def main():
     db_path.unlink(missing_ok=True)
 
     print(f"\n{'='*60}")
-    print(f"  🎉 OutLook AnyFinder Ver0.9 — 전체 기능 검증 완료!")
+    print(f"  🎉 OutLook AnyFinder Ver0.9.1 — 전체 기능 검증 완료!")
     print(f"{'='*60}\n")
 
 

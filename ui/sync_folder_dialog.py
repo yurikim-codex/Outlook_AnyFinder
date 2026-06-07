@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [U11] 수동 동기화 대상 폴더 선택 다이얼로그
 """
 

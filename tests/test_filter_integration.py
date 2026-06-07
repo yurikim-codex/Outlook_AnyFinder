@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [C11] 필터 고도화 통합 테스트
 """
 

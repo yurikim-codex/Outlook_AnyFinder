@@ -1,4 +1,4 @@
-OutLook AnyFinder Ver0.9 - 사내 배포 패키지 README
+OutLook AnyFinder Ver0.9.1 - 사내 배포 패키지 README
 ============================================================
 
 OutLook AnyFinder는 Microsoft Outlook 데스크톱 앱에 저장된 메일을 사용자 PC에 로컬 인덱싱하여 빠르게 검색하는 Windows 데스크톱 프로그램입니다.

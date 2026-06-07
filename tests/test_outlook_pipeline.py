@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [C02] Outlook → DB 파이프라인 테스트
 
 MockOutlookConnector → mail_extractor → index_builder → DB 검증

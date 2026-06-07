@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M09] 추천 연관 검색어 엔진
 
 3가지 소스에서 연관 키워드를 추출하여 검색창 하단에 제안합니다.

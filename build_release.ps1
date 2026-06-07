@@ -6,11 +6,11 @@ OutLook AnyFinder 사내 배포용 빌드 스크립트
     powershell -ExecutionPolicy Bypass -File .\build_release.ps1
 
 결과:
-    release\OutLookAnyFinder_v0.9_YYYYMMDD_HHMM.zip
+    release\OutLookAnyFinder_v0.9.1_YYYYMMDD_HHMM.zip
 #>
 
 param(
-    [string]$Version = "0.9",
+    [string]$Version = "0.9.1",
     [switch]$OneFile
 )
 

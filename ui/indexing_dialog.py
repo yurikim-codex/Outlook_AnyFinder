@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [U09] 인덱싱 진행률 다이얼로그 (v2 — 스마트 동기화 지원)
 
 개선: plan_ready 시그널로 "변경 없음" 상태를 사용자에게 안내

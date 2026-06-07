@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [U01] 메인 윈도우 (v4 — 설정 반영 + 동기화 모드 토글 + 세션 정리)
 """
 
@@ -248,13 +248,8 @@ class MainWindow(QMainWindow):
 
     def _folder_where(self, folder_name: str):
         """Outlook 환경별 폴더명 차이를 흡수하는 WHERE 조건."""
-        aliases = {
-            "받은편지함": ["받은편지함", "받은 편지함", "Inbox"],
-            "보낸편지함": ["보낸편지함", "보낸 편지함", "Sent Items", "Sent"],
-            "임시보관함": ["임시보관함", "임시 보관함", "Drafts"],
-            "지운편지함": ["지운편지함", "지운 편지함", "Deleted Items", "Trash"],
-        }
-        names = aliases.get(folder_name, [folder_name])
+        from data.database import get_ui_folder_aliases
+        names = get_ui_folder_aliases(folder_name)
         placeholders = ",".join("?" for _ in names)
         return (f"folder_name IN ({placeholders})", names)
 
@@ -381,8 +376,21 @@ class MainWindow(QMainWindow):
 
     def _update_sidebar(self):
         try:
-            self.sidebar.update_folder_counts(self.engine.get_folder_counts())
-            self.sidebar.update_sync_status(f"총 {self.engine.get_total_count():,}건 인덱싱됨", True)
+            total = self.engine.get_total_count()
+            self.sidebar.update_folder_counts(self.engine.get_folder_counts(), total_count=total)
+            self.sidebar.update_sync_status(f"총 {total:,}건 인덱싱됨", True)
+            from data.database import get_meta
+            last_sync = get_meta(self.conn, "last_sync_time", None)
+            if last_sync:
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(str(last_sync)[:19])
+                    display = dt.strftime("%m/%d %H:%M")
+                    self.sidebar.update_last_sync_time(f"마지막: {display}")
+                except Exception:
+                    self.sidebar.update_last_sync_time(str(last_sync)[:16])
+            else:
+                self.sidebar.update_last_sync_time(None)
         except: pass
 
     def _focus_search(self):

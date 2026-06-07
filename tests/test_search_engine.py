@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [C05] 검색 엔진 테스트 — FTS5 + BM25 + snippet + 페이지네이션
 """
 

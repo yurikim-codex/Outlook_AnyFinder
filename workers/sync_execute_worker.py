@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [W04] 승인된 동기화 계획 실행 QThread
 
 SyncPlanWorker가 만든 계획을 받아 실제 DB 반영(추가/수정/삭제)을 백그라운드에서 수행한다.

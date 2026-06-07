@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [U02] 사이드바 — 폴더 트리, 북마크, 동기화 상태, 설정
 """
 
@@ -101,8 +101,6 @@ class Sidebar(QWidget):
         folders = [
             ("inbox",  "📥", "받은편지함"),
             ("sent",   "📤", "보낸편지함"),
-            ("drafts", "📝", "임시보관함"),
-            ("trash",  "🗑", "지운편지함"),
         ]
         for key, icon, name in folders:
             row = QWidget()
@@ -125,6 +123,32 @@ class Sidebar(QWidget):
             cnt.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             rl.addWidget(cnt)
             layout.addWidget(row)
+            # 받은편지함 행 오브젝트명 저장 (폴더편지함 삽입 위치 기준)
+            if key == "inbox":
+                row.setObjectName("row_inbox")
+
+        # ── 받은편지함 아래: 폴더편지함 (하위 폴더 합산) ──
+        self.other_row = QWidget()
+        self.other_row.setObjectName("row_other")
+        self.other_row.setStyleSheet("background:transparent;border:none;")
+        ol = QHBoxLayout(self.other_row)
+        ol.setContentsMargins(0, 0, 0, 0)
+        ol.setSpacing(0)
+        other_name = QLabel("  └ 폴더편지함")
+        other_name.setFont(QFont("Segoe UI", Fonts.SIZE_XS))
+        other_name.setStyleSheet(f"color:{Colors.TEXT_MUTED};padding:3px 0 3px 14px;background:transparent;border:none;")
+        ol.addWidget(other_name, 1)
+        self.other_cnt_label = QLabel()
+        self.other_cnt_label.setObjectName("cnt_other")
+        self.other_cnt_label.setFont(QFont("Segoe UI", Fonts.SIZE_XS))
+        self.other_cnt_label.setStyleSheet(f"color:{Colors.TEXT_DIM};padding-right:6px;background:transparent;border:none;font-weight:bold;")
+        self.other_cnt_label.setFixedWidth(58)
+        self.other_cnt_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        ol.addWidget(self.other_cnt_label)
+        # 받은편지함 바로 아래에 배치
+        inbox_idx = layout.indexOf(self.findChild(QWidget, "row_inbox"))
+        layout.insertWidget(inbox_idx + 1, self.other_row)
+        self.other_row.hide()
 
         # 지운 편지함 아래 실시간 동기화 진행 표시
         self.sync_progress_card = QWidget()
@@ -203,6 +227,26 @@ class Sidebar(QWidget):
         sl.addWidget(self.sync_stop_btn)
 
         layout.addWidget(sync_card)
+        layout.addSpacing(4)
+
+        # ── 최근 동기화 ──
+        self.last_sync_card = QWidget()
+        self.last_sync_card.setStyleSheet(f"background:{Colors.BG_CARD};border:1px solid {Colors.BORDER};border-radius:{Radius.MD}px;")
+        lsc = QVBoxLayout(self.last_sync_card)
+        lsc.setContentsMargins(10, 7, 10, 7)
+        lsc.setSpacing(2)
+        self.last_sync_title = QLabel("🕐 최근 동기화")
+        self.last_sync_title.setFont(QFont("Segoe UI", Fonts.SIZE_XS, QFont.Weight.Bold))
+        self.last_sync_title.setStyleSheet(f"color:{Colors.TEXT_DIM};background:transparent;border:none;")
+        lsc.addWidget(self.last_sync_title)
+        self.last_sync_time_label = QLabel("아직 동기화 없음")
+        self.last_sync_time_label.setFont(QFont("Segoe UI", Fonts.SIZE_XS))
+        self.last_sync_time_label.setStyleSheet(f"color:{Colors.TEXT_MUTED};background:transparent;border:none;")
+        self.last_sync_time_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.last_sync_time_label.mousePressEvent = lambda e: self.sync_requested.emit()
+        lsc.addWidget(self.last_sync_time_label)
+        layout.addWidget(self.last_sync_card)
+
         layout.addSpacing(6)
 
         # 설정
@@ -213,23 +257,48 @@ class Sidebar(QWidget):
 
     # ── 공개 메서드 ──
 
-    def update_folder_counts(self, counts: dict):
+    def update_folder_counts(self, counts: dict, total_count: int = None):
         """폴더별 메일 수 업데이트.
 
         Outlook/버전별로 '받은편지함'과 '받은 편지함'처럼 공백이 다른 이름이
         섞여 저장될 수 있으므로 대표 폴더는 별칭을 합산한다.
+        하위 폴더/별칭 외 폴더는 '폴더편지함' 행으로 받은편지함 아래에 표시한다.
         """
-        aliases = {
-            "inbox": ["받은편지함", "받은 편지함", "Inbox"],
-            "sent": ["보낸편지함", "보낸 편지함", "Sent Items", "Sent"],
-            "drafts": ["임시보관함", "임시 보관함", "Drafts"],
-            "trash": ["지운편지함", "지운 편지함", "Deleted Items", "Trash"],
-        }
-        for key, names in aliases.items():
+        from data.database import get_sidebar_aliases
+        known_names = set()
+        for key in ["inbox", "sent"]:
+            for name in get_sidebar_aliases(key):
+                known_names.add(name)
+
+        for key in ["inbox", "sent"]:
             lbl = self.findChild(QLabel, f"cnt_{key}")
             if lbl:
+                names = get_sidebar_aliases(key)
                 cnt = sum(counts.get(name, 0) for name in names)
                 lbl.setText(f"{cnt:,}" if cnt else "—")
+
+        # 받은편지함 아래 폴더편지함 행: 기타 폴더(하위 폴더 등) 합산
+        if total_count is not None and total_count > 0:
+            known_sum = sum(
+                sum(counts.get(name, 0) for name in get_sidebar_aliases(key))
+                for key in ["inbox", "sent"]
+            )
+            other_cnt = sum(cnt for name, cnt in counts.items() if name not in known_names)
+            actual_other = total_count - known_sum
+            display_other = actual_other if actual_other > 0 else other_cnt
+            if display_other > 0:
+                self.other_cnt_label.setText(f"{display_other:,}")
+                self.other_row.show()
+            else:
+                self.other_row.hide()
+        else:
+            # total_count 없으면 기존 GROUP BY 기준으로 표시
+            other_cnt = sum(cnt for name, cnt in counts.items() if name not in known_names)
+            if other_cnt > 0:
+                self.other_cnt_label.setText(f"{other_cnt:,}")
+                self.other_row.show()
+            else:
+                self.other_row.hide()
 
     def update_sync_status(self, message: str, ok: bool = True):
         # 동기화 실행 중에는 상세 작업현황을 하단 '동기화' 섹션에 중복 표시하지 않는다.
@@ -289,6 +358,15 @@ class Sidebar(QWidget):
             self.sync_info.setText(f"{self.sync_info.text().split('·')[0].strip()} · {mode_text}")
         except Exception:
             pass
+
+    def update_last_sync_time(self, time_str: str):
+        """최근 동기화 시각 표시. time_str이 None/빈값이면 '아직 동기화 없음'."""
+        if time_str:
+            self.last_sync_time_label.setText(time_str)
+            self.last_sync_time_label.setStyleSheet(f"color:{Colors.TEXT_SECONDARY};background:transparent;border:none;")
+        else:
+            self.last_sync_time_label.setText("아직 동기화 없음")
+            self.last_sync_time_label.setStyleSheet(f"color:{Colors.TEXT_MUTED};background:transparent;border:none;")
 
     def update_bookmarks(self, bookmarks: list):
         """북마크 목록 갱신"""

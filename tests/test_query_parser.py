@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [C06] 쿼리 파서 테스트 — 자연어 → FTS5 변환 12+ 케이스
 """
 

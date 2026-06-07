@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 에러 핸들링 통합 모듈
 
 5가지 핵심 에러 시나리오:

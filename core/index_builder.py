@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M03] FTS5 인덱스 구축 (v3 — email_hashes 테이블 기반)
 """
 

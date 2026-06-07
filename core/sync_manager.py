@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M06] 스마트 증분 동기화 (v3 — email_hashes 테이블 기반)
 """
 
@@ -76,9 +76,13 @@ def _normalize_read_value(is_read) -> int:
     return 1 if is_read else 0
 
 
-def compute_scan_hash(last_modified: str, is_read) -> str:
-    """Outlook 빠른 스캔용 해시: 최종 수정시각 + 읽음 상태."""
-    key = str(last_modified or "")[:19] + str(_normalize_read_value(is_read))
+def compute_scan_hash(last_modified: str, is_read, folder_name: str = "") -> str:
+    """Outlook 빠른 스캔용 해시: 최종 수정시각 + 읽음 상태 + 폴더명.
+
+    folder_name을 포함하여 메일이 다른 폴더로 이동(예: 받은편지함→지운편지함)되었을 때
+    해시 불일치로 'updated' 감지가 가능하도록 한다.
+    """
+    key = str(last_modified or "")[:19] + str(_normalize_read_value(is_read)) + str(folder_name or "")
     return hashlib.md5(key.encode("utf-8", errors="ignore")).hexdigest()[:12]
 
 
@@ -89,7 +93,11 @@ def compute_mail_hash(mail_data: dict) -> str:
     구버전/Mock 데이터처럼 last_modified가 없으면 기존 내용 기반 해시로 폴백한다.
     """
     if mail_data.get("last_modified"):
-        return compute_scan_hash(mail_data.get("last_modified", ""), mail_data.get("is_read", 1))
+        return compute_scan_hash(
+            mail_data.get("last_modified", ""),
+            mail_data.get("is_read", 1),
+            mail_data.get("folder_name", ""),
+        )
     key = (
         str(mail_data.get("subject", "")) +
         str(mail_data.get("sender_name", "")) +
@@ -173,18 +181,24 @@ class SyncManager:
         if on_status: on_status(f"Outlook {plan.total_outlook:,}건 스캔, DB와 비교 중...")
 
         # 2단계: DB와 비교 (email_hashes 테이블 사용)
-        # 자동 증분 동기화는 변경/추가분만 스캔하므로 DB 비교 대상은 선택 폴더 전체로 잡고,
-        # 삭제 감지는 수행하지 않는다. 삭제 감지는 수동 전체/범위 동기화에서 처리한다.
-        db_entry_ids = self._get_db_entry_ids(after_date=None if incremental else after_date, folder_ids=folder_ids)
+        # 신규/업데이트 감지: DB 전체 entry_id를 대상으로 비교한다.
+        # 폴더 필터를 사용하면 하위 폴더(별칭 외 이름) 이메일이 DB에 있어도
+        # 매번 'new'로 오탐지되어 불필요한 재처리가 발생한다.
+        all_db_entry_ids = self._get_db_entry_ids(after_date=None if incremental else after_date, folder_ids=None)
+        # 삭제 감지용: 선택 폴더의 DB entry_id만 대상으로 한다.
+        # 동기화하지 않는 폴더의 이메일을 삭제하면 안 되기 때문.
+        synced_db_entry_ids = self._get_db_entry_ids(after_date=None if incremental else after_date, folder_ids=folder_ids)
         saved_hashes = get_all_hashes(self.conn)  # {entry_id: hash} — O(1) 조회
-        plan.total_db = len(db_entry_ids)
+        plan.total_db = len(all_db_entry_ids)
 
         outlook_ids = set(outlook_entries.keys())
 
-        plan.new_ids = list(outlook_ids - db_entry_ids)
-        plan.deleted_ids = [] if incremental else list(db_entry_ids - outlook_ids)
+        plan.new_ids = list(outlook_ids - all_db_entry_ids)
+        # 증분 동기화: 삭제 감지 생략 (변경분만 스캔하므로 전체 entry_id 부족)
+        # 비증분(수동) 동기화: 전체 스캔이므로 삭제 감지 가능
+        plan.deleted_ids = [] if incremental else list(synced_db_entry_ids - outlook_ids)
 
-        common = outlook_ids & db_entry_ids
+        common = outlook_ids & all_db_entry_ids
         for eid in common:
             new_hash = outlook_entries.get(eid, "")
             old_hash = saved_hashes.get(eid, "")
@@ -201,7 +215,7 @@ class SyncManager:
 
     def execute_plan(self, plan, folder_ids=None, include_subfolders=True,
                       on_progress=None, should_stop=None, after_date=None,
-                      incremental=False) -> SyncResult:
+                      incremental=False, mail_after_date=None) -> SyncResult:
         folder_ids = folder_ids or [6, 5]
         result = SyncResult(plan=plan)
         start = time.time()
@@ -352,58 +366,102 @@ class SyncManager:
     def _scan_items(self, folder, entries, should_stop=None, after_date=None,
                     scan_state=None, on_scan_progress=None, incremental=False,
                     date_basis="received", mail_after_date=None):
+        """폴더 아이템 스캔 — entry_id + 해시 수집.
+
+        [증분 모드]  Restrict로 변경분만 고속 스캔 → 해시 계산.
+                     삭제 감지는 하지 않음 (성능 우선).
+        [비증분 모드] 전체 스캔 → 해시 계산 + 삭제 감지.
+        """
         try:
+            folder_name = str(getattr(folder, "Name", ""))
             items = folder.Items
-            break_on_old_incremental = False
+            break_on_old = False
+
+            # ── Restrict / 정렬 설정 ──
             if after_date and incremental:
-                try:
-                    items = items.Restrict(f"[LastModificationTime] > '{after_date}'")
-                except Exception:
-                    # Restrict 실패 시 LastModificationTime 내림차순으로 정렬하고 오래된 항목에서 중단
+                # 증분: Restrict로 LastModificationTime >= after_date 항목만
+                restricted = None
+                if hasattr(self.connector, '_restrict_items_after'):
+                    restricted = self.connector._restrict_items_after(
+                        items, "LastModificationTime", after_date)
+                if restricted is None:
                     try:
-                        items.Sort("[LastModificationTime]", True)
-                        break_on_old_incremental = True
+                        restricted = items.Restrict(
+                            f"[LastModificationTime] >= '{after_date}'")
                     except Exception:
                         pass
-            # 필요한 속성만 로딩하도록 힌트를 주어 COM 속성 접근 비용을 줄인다.
-            # Outlook/스토어 종류에 따라 실패할 수 있으므로 실패해도 기존 방식으로 진행한다.
+                if restricted is not None:
+                    items = restricted
+                else:
+                    # Restrict 실패 → 정렬 후 오래된 항목에서 break
+                    try:
+                        items.Sort("[LastModificationTime]", True)
+                        break_on_old = True
+                    except Exception:
+                        pass
+            elif after_date and not incremental:
+                # 기간 동기화: ReceivedTime/SentOn 기준 Restrict
+                field = "SentOn" if date_basis == "sent" else "ReceivedTime"
+                if hasattr(self.connector, '_restrict_items_after'):
+                    restricted = self.connector._restrict_items_after(
+                        items, field, after_date)
+                    if restricted is not None:
+                        items = restricted
+
+            # ── 속성 힌트 ──
             try:
-                items.SetColumns("EntryID,LastModificationTime,ReceivedTime,SentOn,UnRead,Class")
+                items.SetColumns(
+                    "EntryID,LastModificationTime,ReceivedTime,SentOn,UnRead,Class")
             except Exception:
                 pass
 
-            folder_name = str(getattr(folder, "Name", ""))
-            self._emit_scan_progress(scan_state, on_scan_progress, "스캔 중...", folder_name, force=True)
+            self._emit_scan_progress(scan_state, on_scan_progress,
+                "스캔 중...", folder_name, force=True)
+
+            # ── 순회 ──
             for msg in items:
                 if should_stop and should_stop():
                     break
                 try:
                     if scan_state is not None:
                         scan_state["done"] = scan_state.get("done", 0) + 1
-                    if msg.Class == 43:
-                        if after_date and incremental:
-                            mod_dt = self._to_datetime(getattr(msg, "LastModificationTime", None))
-                            base_dt = self._to_datetime(after_date)
-                            if mod_dt and base_dt and mod_dt < base_dt:
-                                if break_on_old_incremental:
-                                    break
-                                self._emit_scan_progress(scan_state, on_scan_progress, "범위 외 메일 확인 중...", folder_name)
-                                continue
-                        elif after_date and not self._msg_in_range(msg, after_date, incremental=incremental, folder_name=folder_name, date_basis=date_basis):
-                            self._emit_scan_progress(scan_state, on_scan_progress, "범위 외 메일 확인 중...", folder_name)
+                    if msg.Class != 43:
+                        continue
+                    eid = str(msg.EntryID or "")
+                    if not eid:
+                        continue
+
+                    # ── 날짜 필터 ──
+                    if after_date and incremental:
+                        mod_dt = self._to_datetime(getattr(msg, "LastModificationTime", None))
+                        base_dt = self._to_datetime(after_date)
+                        if mod_dt and base_dt and mod_dt < base_dt:
+                            if break_on_old:
+                                break  # 정렬 보장: 이후는 모두 오래된 항목
                             continue
-                        if mail_after_date and not self._msg_in_range(msg, mail_after_date, incremental=False, folder_name=folder_name, date_basis=date_basis):
-                            self._emit_scan_progress(scan_state, on_scan_progress, "기간 범위 외 메일 확인 중...", folder_name)
-                            continue
-                        eid = msg.EntryID
-                        mod = str(getattr(msg, "LastModificationTime", ""))[:19]
-                        read = 0 if getattr(msg, "UnRead", False) else 1
-                        entries[eid] = compute_scan_hash(mod, read)
-                    self._emit_scan_progress(scan_state, on_scan_progress, f"스캔 중... ({len(entries):,}건 확인)", folder_name)
+                    elif after_date and not self._msg_in_range(
+                        msg, after_date, incremental=False,
+                        folder_name=folder_name, date_basis=date_basis):
+                        continue
+                    if mail_after_date and not self._msg_in_range(
+                        msg, mail_after_date, incremental=False,
+                        folder_name=folder_name, date_basis=date_basis):
+                        continue
+
+                    # ── 해시 계산 ──
+                    mod = str(getattr(msg, "LastModificationTime", ""))[:19]
+                    read = 0 if getattr(msg, "UnRead", False) else 1
+                    entries[eid] = compute_scan_hash(mod, read, folder_name)
+
+                    self._emit_scan_progress(scan_state, on_scan_progress,
+                        f"스캔 중... ({len(entries):,}건)", folder_name)
                 except Exception:
-                    self._emit_scan_progress(scan_state, on_scan_progress, "스캔 중...", folder_name)
+                    self._emit_scan_progress(scan_state, on_scan_progress,
+                        "스캔 중...", folder_name)
                     continue
-        except Exception: pass
+
+        except Exception:
+            pass
 
     def _scan_subs(self, parent, entries, should_stop=None, after_date=None,
                    scan_state=None, on_scan_progress=None, incremental=False,
@@ -424,6 +482,11 @@ class SyncManager:
         except Exception: pass
 
     def _get_db_entry_ids(self, after_date=None, folder_ids=None) -> Set[str]:
+        """DB에 저장된 entry_id 집합 반환.
+
+        폴더 ID가 지정되면 모든 별칭(예: '받은편지함', 'Inbox', '받은 편지함')을
+        포함하여 조회한다. Outlook 환경별 폴더명 차이로 인한 누락을 방지.
+        """
         clauses = []
         params = []
         if after_date:
@@ -431,12 +494,11 @@ class SyncManager:
             params.append(after_date)
         if folder_ids:
             try:
-                from core.outlook_connector import OlDefaultFolders
-                names = [OlDefaultFolders.NAMES.get(fid) for fid in folder_ids if OlDefaultFolders.NAMES.get(fid)]
-                if names:
-                    placeholders = ",".join("?" for _ in names)
-                    clauses.append(f"folder_name IN ({placeholders})")
-                    params.extend(names)
+                from data.database import build_folder_where_clause
+                folder_clause, folder_params = build_folder_where_clause(folder_ids)
+                if folder_params:
+                    clauses.append(folder_clause)
+                    params.extend(folder_params)
             except Exception:
                 pass
         sql = "SELECT entry_id FROM emails"
@@ -450,18 +512,29 @@ class MockSyncManager(SyncManager):
     def _scan_folder(self, folder_id, include_subfolders, should_stop=None, after_date=None,
                      scan_state=None, on_scan_progress=None, incremental=False,
                      mail_after_date=None):
+        """Mock 스캔: 증분 여부와 관계없이 전체 메일을 순회하여 entry_id를 수집한다.
+        해시 비교로 변경 여부를 판별하므로, 삭제 감지도 정상 동작한다.
+        """
         entries = {}
         from core.outlook_connector import OlDefaultFolders
         folder_name = OlDefaultFolders.NAMES.get(folder_id, f"폴더 {folder_id}")
-        for mail in self.connector.iter_mails(folder_id, include_subfolders, after_date=after_date, incremental=incremental):
+
+        # ★ 증분/비증분 관계없이 전체 순회 (Mock이므로 성능 영향 없음)
+        #    해시 비교 단계에서 변경 여부가 판별된다.
+        for mail in self.connector.iter_mails(folder_id, include_subfolders,
+                                               after_date=None, incremental=False):
             if should_stop and should_stop():
                 break
             if scan_state is not None:
                 scan_state["done"] = scan_state.get("done", 0) + 1
-            if mail_after_date and mail.get("received_at", "") and mail.get("received_at", "") < mail_after_date:
-                continue
+            # mail_after_date: 기간 범위 필터 (메일 날짜 기준)
+            if mail_after_date:
+                mail_date = mail.get("received_at", "") or mail.get("sent_at", "")
+                if mail_date and mail_date < mail_after_date:
+                    continue
             eid = mail.get("entry_id", "")
             if eid:
                 entries[eid] = compute_mail_hash(mail)
-            self._emit_scan_progress(scan_state, on_scan_progress, f"스캔 중... ({len(entries):,}건 확인)", folder_name)
+            self._emit_scan_progress(scan_state, on_scan_progress,
+                f"스캔 중... ({len(entries):,}건 확인)", folder_name)
         return entries

@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 스마트 증분 동기화 테스트 — SyncManager / SyncPlan / SyncResult
 """
 

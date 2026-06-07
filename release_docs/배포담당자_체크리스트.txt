@@ -32,7 +32,7 @@ OutLook AnyFinder 사내 배포 담당자 체크리스트
   powershell -ExecutionPolicy Bypass -File .\build_release.ps1
 
 결과:
-  release\OutLookAnyFinder_v0.9_YYYYMMDD_HHMM.zip
+  release\OutLookAnyFinder_v0.9.1_YYYYMMDD_HHMM.zip
 
 
 3. 단일 exe가 필요한 경우

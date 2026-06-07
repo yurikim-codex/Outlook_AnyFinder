@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [W01] 인덱싱 QThread (v3 — 스레드 안전: DB+COM 모두 스레드 내 생성)
 """
 

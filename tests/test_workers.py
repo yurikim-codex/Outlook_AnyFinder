@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [C03] 인덱싱 QThread 워커 테스트
 
 GUI 이벤트 루프 없이 워커의 핵심 로직을 검증합니다.

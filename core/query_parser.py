@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M05] 자연어 → FTS5 쿼리 변환
 
 사용자 입력을 FTS5 MATCH 쿼리와 SQL WHERE 절로 분리 파싱합니다.

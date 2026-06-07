@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M08] 검색어 북마크 관리
 
 자주 사용하는 검색어+필터 조합을 저장하여 원클릭 재검색.

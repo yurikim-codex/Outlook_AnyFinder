@@ -3,7 +3,7 @@ OutLook AnyFinder 실행 가이드
 
 1. 압축 해제
 ------------------------------------------------------------
-전달받은 OutLookAnyFinder_v0.9_*.zip 파일을 원하는 위치에 압축 해제합니다.
+전달받은 OutLookAnyFinder_v0.9.1_*.zip 파일을 원하는 위치에 압축 해제합니다.
 
 예:
   C:\Tools\OutLookAnyFinder\

@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M04] 검색 엔진
 
 FTS5 전문검색 실행, BM25 랭킹, snippet 하이라이트, 페이지네이션

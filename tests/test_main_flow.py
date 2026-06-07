@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [C07~C08] 메인 화면 통합 흐름 테스트
 
 GUI 없이 검색→결과→미리보기 데이터 흐름을 검증합니다.

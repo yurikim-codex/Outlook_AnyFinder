@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [U11] 설정 화면
 
 인덱싱 범위, 동기화 주기, 자동완성 설정, DB 관리 등
@@ -469,11 +469,24 @@ class SettingsDialog(QDialog):
         progress.setMinimumDuration(0)
         progress.setAutoClose(False)
         progress.setAutoReset(False)
+        progress.setMinimumWidth(420)
         progress.setStyleSheet(f"""
             QProgressDialog {{ background:{Colors.BG_MAIN}; color:{Colors.TEXT_PRIMARY}; }}
-            QProgressBar {{ background:{Colors.BG_INPUT}; border:none; border-radius:5px; height:10px; }}
-            QProgressBar::chunk {{ background:{Colors.PRIMARY}; border-radius:5px; }}
-            QLabel {{ color:{Colors.TEXT_PRIMARY}; background:transparent; }}
+            QProgressBar {{
+                background:{Colors.BG_INPUT};
+                border:1px solid {Colors.BORDER};
+                border-radius:6px;
+                height:22px;
+                text-align:center;
+                font-size:{Fonts.SIZE_SM}px;
+                font-weight:bold;
+                color:{Colors.TEXT_PRIMARY};
+            }}
+            QProgressBar::chunk {{
+                background:{Colors.PRIMARY};
+                border-radius:5px;
+            }}
+            QLabel {{ color:{Colors.TEXT_PRIMARY}; background:transparent; font-size:{Fonts.SIZE_BASE}px; }}
         """)
         progress.show()
         QApplication.processEvents()
@@ -497,10 +510,10 @@ class SettingsDialog(QDialog):
             QMessageBox {{ background-color:{Colors.BG_MAIN}; color:{Colors.TEXT_PRIMARY}; }}
             QMessageBox QLabel {{ color:{Colors.TEXT_PRIMARY}; background:transparent; font-size:{Fonts.SIZE_BASE}px; }}
             QMessageBox QPushButton {{
-                min-width:122px; min-height:36px; padding:8px 20px;
-                margin-left:8px; margin-right:8px;
-                border-radius:14px; font-weight:700;
-                border:1px solid {Colors.BORDER_LIGHT};
+                min-width:150px; min-height:38px; padding:8px 24px;
+                margin-left:10px; margin-right:10px;
+                border-radius:10px; font-weight:700;
+                border:2px solid {Colors.BORDER_LIGHT};
                 background:{Colors.BG_CARD}; color:{Colors.TEXT_SECONDARY};
             }}
             QMessageBox QPushButton:hover {{
@@ -508,10 +521,10 @@ class SettingsDialog(QDialog):
                 background:{Colors.BG_CARD_HOVER}; color:{Colors.TEXT_PRIMARY};
             }}
             QMessageBox QPushButton:default {{
-                background:{accent}; color:#FFFFFF; border:1px solid {accent};
+                background:{accent}; color:#FFFFFF; border:2px solid {accent};
             }}
             QMessageBox QPushButton:default:hover {{
-                border:2px solid {accent};
+                border:2px solid {accent}DD;
             }}
         """)
         return box.exec()

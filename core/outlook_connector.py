@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M01] Outlook 연결 (v2 — COM 스레드 안전 + 폴더 접근 복구)
 """
 
@@ -554,8 +554,12 @@ class MockOutlookConnector:
         fname = OlDefaultFolders.NAMES.get(folder_id, "기타")
         for e in self._sample_emails:
             if e["folder_name"] == fname:
-                if after_date and e["received_at"] < after_date:
-                    continue
+                if after_date:
+                    if incremental:
+                        if e.get("last_modified", e.get("received_at", "")) < after_date:
+                            continue
+                    elif e["received_at"] < after_date:
+                        continue
                 yield e
 
     def open_mail_in_outlook(self, entry_id):

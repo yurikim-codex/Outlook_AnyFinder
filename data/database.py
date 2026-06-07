@@ -1,15 +1,81 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M10] SQLite DB 연결 & 스키마 관리 (v3 — 스레드 안전)
+
+v3.1: 폴더명 별칭 유틸리티 추가 — Outlook 환경별 폴더명 변형을 단일 인터페이스로 통합
 """
 
 import sqlite3
 import os
 import time
 from pathlib import Path
+from typing import List, Dict
 
 DATA_DIR = Path.home() / ".outlook_anyfinder"
 DB_PATH = DATA_DIR / "anyfinder.db"
+
+# ─── 폴더명 별칭 (Outlook 환경별 변형 통합) ───
+
+# 폴더 ID → 퀴리용 별칭 리스트 (DB 쿼리에서 folder_name IN (...) 으로 사용)
+FOLDER_ALIASES: Dict[int, List[str]] = {
+    6:  ["받은편지함", "받은 편지함", "Inbox"],
+    5:  ["보낸편지함", "보낸 편지함", "Sent Items", "Sent"],
+    16: ["임시보관함", "임시 보관함", "Drafts"],
+    3:  ["지운편지함", "지운 편지함", "Deleted Items", "Trash"],
+}
+
+# 사이드바 키 → 별칭 리스트 (UI 표시용)
+SIDEBAR_FOLDER_ALIASES: Dict[str, List[str]] = {
+    "inbox":  ["받은편지함", "받은 편지함", "Inbox"],
+    "sent":   ["보낸편지함", "보낸 편지함", "Sent Items", "Sent"],
+    "drafts": ["임시보관함", "임시 보관함", "Drafts"],
+    "trash":  ["지운편지함", "지운 편지함", "Deleted Items", "Trash"],
+}
+
+# UI 표시용 폴더명 → 별칭 리스트
+UI_FOLDER_ALIASES: Dict[str, List[str]] = {
+    "받은편지함": ["받은편지함", "받은 편지함", "Inbox"],
+    "보낸편지함": ["보낸편지함", "보낸 편지함", "Sent Items", "Sent"],
+    "임시보관함": ["임시보관함", "임시 보관함", "Drafts"],
+    "지운편지함": ["지운편지함", "지운 편지함", "Deleted Items", "Trash"],
+}
+
+
+def get_folder_aliases(folder_id: int) -> List[str]:
+    """폴더 ID에 해당하는 모든 별칭 반환. 없으면 빈 리스트."""
+    return FOLDER_ALIASES.get(folder_id, [])
+
+
+def get_sidebar_aliases(key: str) -> List[str]:
+    """사이드바 키에 해당하는 모든 별칭 반환."""
+    return SIDEBAR_FOLDER_ALIASES.get(key, [key])
+
+
+def get_ui_folder_aliases(folder_name: str) -> List[str]:
+    """UI 표시 폴더명에 해당하는 모든 별칭 반환."""
+    return UI_FOLDER_ALIASES.get(folder_name, [folder_name])
+
+
+def get_all_known_folder_names() -> set:
+    """알려진 모든 폴더명(별칭 포함) 집합 반환."""
+    names = set()
+    for aliases in FOLDER_ALIASES.values():
+        names.update(aliases)
+    return names
+
+
+def build_folder_where_clause(folder_ids: List[int]) -> tuple:
+    """폴더 ID 목록으로 (clause, params) 생성. 모든 별칭 포함.
+    folder_ids가 None이거나 비어있으면 필터 없음 (전체)."""
+    if not folder_ids:
+        return ("1=1", [])
+    all_names = []
+    for fid in folder_ids:
+        all_names.extend(get_folder_aliases(fid))
+    if not all_names:
+        return ("1=0", [])
+    placeholders = ",".join("?" for _ in all_names)
+    return (f"folder_name IN ({placeholders})", all_names)
 
 
 def get_db_path() -> Path:

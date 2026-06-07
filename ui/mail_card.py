@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [U06] 메일 결과 카드 (v3)
 - 날짜: "0000년 00월 00일" 형식 + 줄바꿈 후 내용
 - 사각 라운드 외곽선

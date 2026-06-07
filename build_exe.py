@@ -1,12 +1,12 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 사내 배포용 .exe 빌드 스크립트
 
 권장 사용법:
     python build_exe.py
 
 기본 결과:
-    release/OutLookAnyFinder_v0.9_YYYYMMDD_HHMM.zip
+    release/OutLookAnyFinder_v0.9.1_YYYYMMDD_HHMM.zip
 
 옵션:
     python build_exe.py --onefile   # 단일 exe 방식
@@ -21,7 +21,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-VERSION = "0.9"
+VERSION = "0.9.1"
 
 
 def run(cmd, **kwargs):

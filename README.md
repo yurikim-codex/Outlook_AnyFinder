@@ -1,4 +1,4 @@
-# 📧 OutLook AnyFinder for SESUNG Team (Ver0.9)
+# 📧 OutLook AnyFinder for SESUNG Team (Ver0.9.1)
 
 > **Outlook 대용량 메일 검색에 쓰는 시간을 줄이기 위한 로컬 메일 검색 도구입니다.**  
 > Microsoft Outlook 데스크톱 메일을 사용자 PC에 로컬 인덱싱하고, SQLite FTS5 기반으로 빠르게 검색합니다.
@@ -93,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File .\build_release.ps1
 빌드 결과:
 
 ```text
-release/OutLookAnyFinder_v0.9_YYYYMMDD_HHMM.zip
+release/OutLookAnyFinder_v0.9.1_YYYYMMDD_HHMM.zip
 ```
 
 단일 exe가 필요한 경우:
@@ -283,6 +283,8 @@ FTS5 검색 인덱스
 | 문서 | 설명 |
 |---|---|
 | [실행_가이드.md](./실행_가이드.md) | 설치/실행/검색/동기화/배포 가이드 |
+| [OPTIMIZATION_REPORT.md](./OPTIMIZATION_REPORT.md) | 최적화 보완 보고서 (v0.9.1) |
+| [REVIEW_REPORT.md](./REVIEW_REPORT.md) | 전체 로직 검토 보고서 |
 | [release_docs/README_사내배포.txt](./release_docs/README_사내배포.txt) | 사내 배포 패키지 README |
 | [release_docs/실행_가이드.txt](./release_docs/실행_가이드.txt) | 사용자용 실행 안내 |
 | [release_docs/문제해결_가이드.txt](./release_docs/문제해결_가이드.txt) | 문제 해결 안내 |
@@ -294,6 +296,7 @@ FTS5 검색 인덱스
 
 | 버전 | 내용 |
 |---|---|
+| v0.9.1 | 재동기화 누락·합계 불일치·삭제감지 보완, 사이드바 개선, 설정 UX 강화 (2026-06-07) |
 | v0.9 | Outlook 로컬 인덱싱/검색 MVP, 증분 동기화, 자동 동기화, 테마, 사내 배포 패키지 지원 |
 
 ---

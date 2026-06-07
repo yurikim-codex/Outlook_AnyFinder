@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 [M02] 메일 데이터 정제 & 변환
 
 Outlook에서 추출한 raw dict → EmailRecord 변환

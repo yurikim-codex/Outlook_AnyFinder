@@ -7,7 +7,7 @@ echo OutLook AnyFinder field-test release build
 echo ============================================================
 echo.
 echo Build mode : onedir package recommended for internal testing
-echo Output     : release\OutLookAnyFinder_v0.9_YYYYMMDD_HHMM.zip
+echo Output     : release\OutLookAnyFinder_v0.9.1_YYYYMMDD_HHMM.zip
 echo.
 
 set PY_CMD=

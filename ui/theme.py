@@ -1,5 +1,5 @@
 """
-OutLook AnyFinder Ver0.9 for SESUNG Team
+OutLook AnyFinder Ver0.9.1.1 for SESUNG Team
 테마 & 디자인 토큰 시스템
 
 설정에서 선택 가능한 UI 테마:
@@ -8,7 +8,7 @@ OutLook AnyFinder Ver0.9 for SESUNG Team
 """
 
 APP_NAME = "OutLook AnyFinder"
-APP_VERSION = "Ver0.9"
+APP_VERSION = "Ver0.9.1"
 APP_SUBTITLE = "for SESUNG Team"
 APP_FULL_NAME = f"{APP_NAME} {APP_VERSION} {APP_SUBTITLE}"
 
