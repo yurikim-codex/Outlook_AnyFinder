@@ -3,6 +3,11 @@
 > **Outlook 대용량 메일 검색에 쓰는 시간을 줄이기 위한 로컬 메일 검색 도구입니다.**  
 > Microsoft Outlook 데스크톱 메일을 사용자 PC에 로컬 인덱싱하고, SQLite FTS5 기반으로 빠르게 검색합니다.
 
+> 🚧 **React + Tauri 전환 진행 중** — [MIGRATION_PLAN.md](./MIGRATION_PLAN.md)
+> - 기존 PyQt6 UI(`ui/`, `main.py`)는 `legacy_pyqt/`로 이동했습니다 (전환 완료 시까지 롤백용으로 보존).
+> - 비즈니스 로직(`core/`, `data/`, `utils/`)은 무수정 유지되며, 새 `sidecar/`(JSON Lines IPC 프로세스)에서 그대로 재사용됩니다.
+> - 사이드카 검증: `py -3 -m pytest tests/ -q` (289 passed) / `py -3 sidecar\dev_client.py --doctor` (34/34)
+
 ---
 
 ## ✨ 주요 기능
@@ -66,11 +71,18 @@ release_docs/문제해결_가이드.txt
 
 ---
 
-### 방법 2. Python으로 개발 실행
+### 방법 2. Python으로 개발 실행 (기존 PyQt6 UI)
 
 ```bash
 pip install -r requirements.txt
-python main.py
+python legacy_pyqt/main.py
+```
+
+### 방법 3. 사이드카 개발 실행 (React + Tauri 전환 — IPC 프로토콜만)
+
+```bash
+py -3 -m sidecar --mock              # Mock 모드 사이드카 기동 (stdin/stdout JSON Lines)
+py -3 sidecar\dev_client.py --doctor # 자동 진단 34항목
 ```
 
 ---
@@ -188,12 +200,12 @@ LastModificationTime > last_sync_time
 
 ---
 
-## 📁 프로젝트 구조
+## 📁 프로젝트 구조 (React + Tauri 전환 중)
 
 ```text
 Outlook_AnyFinder/
-├── main.py                         # 앱 진입점 / AppController
-├── core/                           # 핵심 비즈니스 로직
+├── MIGRATION_PLAN.md               # ★ React+Tauri 전환 계획/진행 상태
+├── core/                           # 핵심 비즈니스 로직 (Qt 의존 0 — 무수정 재사용)
 │   ├── outlook_connector.py        # Outlook COM/MAPI 연결 및 메일 추출
 │   ├── mail_extractor.py           # raw 메일 데이터 → EmailRecord 변환
 │   ├── index_builder.py            # 전체 인덱싱/FTS 구축
@@ -203,34 +215,34 @@ Outlook_AnyFinder/
 ├── data/
 │   ├── database.py                 # SQLite 연결, 스키마, 메타 정보
 │   └── models.py                   # 데이터 모델
-├── ui/
-│   ├── main_window.py              # 메인 윈도우
-│   ├── sidebar.py                  # 사이드바/동기화 진행 표시
-│   ├── search_bar.py               # 검색창/정확 단어 옵션/메일주소 인라인 완성
-│   ├── filter_bar.py               # 필터 바
-│   ├── result_list.py              # 검색 결과 리스트/페이지네이션
-│   ├── mail_card.py                # 검색 결과 카드
-│   ├── mail_preview.py             # 메일 상세 미리보기
-│   ├── settings_dialog.py          # 설정 화면
-│   ├── sync_folder_dialog.py       # 동기화 대상 폴더/범위 선택
-│   └── theme.py                    # 다크/화이트 테마 토큰
-├── workers/
-│   ├── indexing_worker.py          # 최초/전체 인덱싱 QThread
-│   ├── sync_plan_worker.py         # 동기화 스캔/비교 QThread
-│   ├── sync_execute_worker.py      # 승인된 동기화 실행 QThread
-│   └── sync_worker.py              # 자동 증분 동기화 QThread
 ├── utils/                          # 설정, 날짜, HTML 정리 유틸
-├── tests/                          # 테스트
-├── release_docs/                   # 사내 배포 문서
-├── build_exe.py                    # Python 빌드 스크립트
-├── build_release.ps1               # 사내 배포 패키지 빌드 스크립트
-├── build_release.bat               # Windows용 빌드 실행 배치
-├── OutLookAnyFinder.spec           # PyInstaller onedir spec
+├── sidecar/                        # ★ Python Sidecar (JSON Lines IPC 프로세스)
+│   ├── __main__.py                 # 엔트리: UTF-8 강제 + stdout 보호 + IPC 루프
+│   ├── ipc.py                      # JSON Lines 서버 (방어 파서)
+│   ├── dispatcher.py               # cmd → handler 라우팅 (40개 명령)
+│   ├── com_worker.py               # ★ Outlook COM 전담 STA 스레드 + Job Queue
+│   ├── stdio_guard.py              # cp949 대응 UTF-8 강제 / stdout 오염 차단
+│   ├── handlers/                   # system/db/search/sync/index/bookmark/settings...
+│   ├── dev_client.py               # Rust 없는 진단 도구 (--doctor/--repl)
+│   ├── build_sidecar.ps1           # PyInstaller --onedir 빌드
+│   └── README.md                   # ★ IPC 계약서 (Rust/React 구현 기준)
+├── legacy_pyqt/                    # 기존 PyQt6 앱 (전환 완료 시까지 롤백용 보존)
+│   ├── main.py                     # 앱 진입점 / AppController
+│   └── ui/                         # 메인 윈도우/사이드바/검색/설정 등 PyQt6 UI
+├── workers/                        # PyQt6 QThread 워커 (legacy 전용)
+├── tests/                          # 테스트 (legacy 198 + sidecar IPC 91)
+├── release_docs/                   # 사내 배포 문서 (PyQt6 버전 기준)
+├── build_exe.py                    # legacy PyQt6 빌드 스크립트
+├── build_release.ps1/.bat          # legacy 사내 배포 패키지 빌드
+├── OutLookAnyFinder.spec           # legacy PyInstaller onedir spec
 ├── version_info.txt                # Windows exe 메타데이터
 ├── 실행_가이드.md                  # 설치/실행 가이드
 ├── .gitignore
 └── requirements.txt
 ```
+
+> 전환 완료 시 `frontend/`(React) + `src-tauri/`(Rust)가 추가되고 `legacy_pyqt/`·`workers/`는 제거됩니다.
+> 진행 상태와 단계별 계획은 [MIGRATION_PLAN.md](./MIGRATION_PLAN.md)를 참고하세요.
 
 ---
 

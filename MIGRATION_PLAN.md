@@ -861,4 +861,23 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 ---
 
+## 부록 C. 저장소 반영 현황 (2026-10-02, Arena 세션)
+
+이 문서는 로컬(Windows) 작업 기준의 진행 상태를 포함한다. GitHub 저장소 반영 기준 실제 상태는 다음과 같다.
+
+| Phase | 저장소 반영 상태 |
+|---|---|
+| 0-1 | ✅ `baseline-v0.9.1.1` 태그 원격 존재 (b6ebc46 가리킴). 브랜치는 세션 브랜치 `arena/01a0faf7-outlook-anyfinder`에서 진행 |
+| 0-2 | ✅ `ui/` + `main.py` → `legacy_pyqt/` 이동 완료. pytest **198 passed 유지**. legacy 빌드 스크립트(spec/build_exe/build_release) 경로 갱신 |
+| 0-3 | ⬜ Rust 툴체인은 Windows PC에서 설치 필요 (Linux 개발 샌드박스는 Node v22만 가용) |
+| 0-4/0-5 | ⬜ 스파이크 A(Tauri hello-world)/B(실 Outlook STA 100회)는 **Windows 실기기 필요** |
+| 0-6 | ✅ 스파이크 C — `search.query` IPC 경유 실행 성공 (Linux/Mock, 통합 테스트로 고정) |
+| 1 | ✅ **저장소 기준으로 계약 재구현 완료**: 명령 40개, `sidecar/` 15개 파일, `tests/test_sidecar_ipc.py` 91개. 전체 **289 passed** (198+91, 회귀 0), `dev_client --doctor` **34/34**. 계획서 Phase 1의 Windows 버그 수정(cp949 UTF-8 강제, SIGBREAK, fd 레벨 stdout 보호, stderr drain)과 잠재 버그 3건(북마크 삭제 반환값, dict 스냅샷, 다중 폴더 OR) 전부 반영. ※ 로컬 Windows에 별도 Phase 1 구현이 있다면 이 저장소 버전과 대조 필요 |
+| 2~5 | ⬜ 미착수 — 다음 단계 (Phase 2: `src-tauri/`, Phase 3: `frontend/`) |
+
+추가로 반영된 것:
+- `sync_meta.schema_version` 도입 (사이드카가 DB 열 때 자동 기록, `db.schema_version` 명령) — 구 REVIEW_REPORT §4.3 및 본 계획 리스크 4 대응
+- `db.backup` 명령 (sqlite3 backup API, WAL 안전) — 리스크 4의 마이그레이션 전 백업 대응
+- Mock 고정 날짜(2026-05-27) 타임밤 방지: 테스트/doctor는 기간 필터(range_months>0)를 쓰지 않도록 고정
+
 **문서 끝.**

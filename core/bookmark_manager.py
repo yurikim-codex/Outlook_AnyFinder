@@ -85,12 +85,21 @@ class BookmarkManager:
             return None
 
     def delete(self, bookmark_id: int) -> bool:
-        """북마크 삭제"""
+        """북마크 삭제.
+
+        Returns:
+            True = 실제 삭제됨, False = 실패 또는 존재하지 않는 ID
+            (MIGRATION_PLAN Phase 1 잠재 버그 #1 수정: 없는 ID에도 True를 반환하던 문제)
+        """
         try:
-            self.conn.execute("DELETE FROM bookmarks WHERE id = ?", (bookmark_id,))
+            cursor = self.conn.execute("DELETE FROM bookmarks WHERE id = ?", (bookmark_id,))
             self.conn.commit()
-            logger.info(f"북마크 삭제: ID={bookmark_id}")
-            return True
+            removed = cursor.rowcount > 0
+            if removed:
+                logger.info(f"북마크 삭제: ID={bookmark_id}")
+            else:
+                logger.warning(f"북마크 삭제 요청 — 존재하지 않는 ID: {bookmark_id}")
+            return removed
         except Exception as e:
             logger.error(f"북마크 삭제 실패: {e}")
             return False
