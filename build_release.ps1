@@ -56,7 +56,9 @@ if ($OneFile) {
         --hidden-import win32com `
         --hidden-import win32com.client `
         --hidden-import bs4 `
-        main.py
+        --paths . `
+        --paths legacy_pyqt `
+        legacy_pyqt\main.py
     $BuiltPath = Join-Path $ProjectRoot "dist\OutLookAnyFinder.exe"
 } else {
     Write-Host "Building onedir package using OutLookAnyFinder.spec..." -ForegroundColor Yellow

@@ -101,7 +101,10 @@ def build_onefile():
         "--collect-submodules", "win32com",
         "--collect-data", "win32com",
         "--collect-binaries", "pywin32_system32",
-        "main.py",
+        # Phase 0-2: PyQt6 UI가 legacy_pyqt/로 이동함 (React+Tauri 전환 기간 롤백용 빌드 유지)
+        "--paths", ".",
+        "--paths", "legacy_pyqt",
+        str(ROOT / "legacy_pyqt" / "main.py"),
     ]
     run(cmd)
     return ROOT / "dist" / "OutLookAnyFinder.exe"

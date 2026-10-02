@@ -14,6 +14,12 @@ import sys
 import logging
 from pathlib import Path
 
+# ★ Phase 0-2: legacy_pyqt/ 이동 후에도 core/data/utils/workers import가 동작하도록
+#   저장소 루트를 sys.path에 추가한다. (ui/는 이 파일과 같은 legacy_pyqt/에 있음)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from PyQt6.QtWidgets import QApplication, QDialog, QMessageBox, QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QFont, QPalette, QColor, QIcon, QPixmap, QPainter, QAction
 from PyQt6.QtCore import Qt, QTimer

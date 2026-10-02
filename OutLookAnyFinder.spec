@@ -28,8 +28,9 @@ hiddenimports += [
 ]
 
 # 소스 폴더는 import로 포함되지만, 내부 배포 안정성을 위해 함께 수집합니다.
+# Phase 0-2: PyQt6 UI는 legacy_pyqt/로 이동 (React+Tauri 전환 기간 롤백용 빌드 유지)
 datas = [
-    ('ui', 'ui'),
+    ('legacy_pyqt/ui', 'ui'),
     ('core', 'core'),
     ('data', 'data'),
     ('utils', 'utils'),
@@ -48,8 +49,8 @@ except Exception:
     pass
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ['legacy_pyqt/main.py'],
+    pathex=['.', 'legacy_pyqt'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
