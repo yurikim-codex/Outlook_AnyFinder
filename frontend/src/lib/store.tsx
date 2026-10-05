@@ -72,6 +72,7 @@ interface AppContextValue {
   firstRun: boolean;
   systemInfo: SystemInfo | null;
   versionWarning: string | null;
+  relatedKeywords: string[];
   // actions
   doSearch: (patch: Partial<SearchParams>, opts?: { resetPage?: boolean }) => Promise<void>;
   selectItem: (item: SearchItem | null) => void;
@@ -124,6 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [firstRun, setFirstRun] = useState(false);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [versionWarning, setVersionWarning] = useState<string | null>(null);
+  const [relatedKeywords, setRelatedKeywords] = useState<string[]>([]);
 
   const bootstrapped = useRef(false);
   const searchSeq = useRef(0);
@@ -427,6 +429,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [transport, bootstrap, runSync, toast]);
 
+  // ── 연관 검색어 (Parity #7): 검색 완료 시 자동 조회 ──
+
+  useEffect(() => {
+    const q = search.response?.query?.trim();
+    if (!q) {
+      setRelatedKeywords([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .searchRelated(transport, q, 8)
+      .then((r) => {
+        if (!cancelled) setRelatedKeywords(r.keywords ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setRelatedKeywords([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [transport, search.response]);
+
   // ── 자동 동기화 스케줄러 (Phase 3-9): 만료 시점에 busy면 다음 틱으로 지연 ──
 
   useEffect(() => {
@@ -476,6 +500,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     firstRun,
     systemInfo,
     versionWarning,
+    relatedKeywords,
     doSearch,
     selectItem,
     openDialog: setDialog,

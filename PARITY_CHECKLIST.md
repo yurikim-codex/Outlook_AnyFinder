@@ -18,7 +18,7 @@
 | 4 | 메일 주소 검색 (search_bar) | `search.query` + `autocomplete.emails` | S4 | ✅ |
 | 5 | 자동완성 팝업 (autocomplete_popup) | Header 드롭다운(`autocomplete.suggest`, 200ms 디바운스) | S5 | ✅ ⚠️ 지연값 설정(300ms) 대신 200ms 고정 |
 | 6 | 검색 기록 저장 (search_bar) | `record_history` + `search.history` | auto(test_24), S5 | ✅ |
-| 7 | 연관 검색어 (result_list 하단) | `search.related` — **현재 UI 미노출** | — | ⚠️ Phase 4.1에서 결과 헤더 chips로 노출 예정(기능은 사이드카에 존재) |
+| 7 | 연관 검색어 (result_list 하단) | `search.related` + `RelatedChips` (결과 상단 칩 — 클릭 시 재검색. 검색기록 접두사/세션/정적사전 기반) | auto(사이드카 related 테스트), S5 | ✅ |
 
 ## 2. 필터
 
@@ -87,11 +87,11 @@
 
 | 판정 | 건수 |
 |---|---|
-| ✅ parity (자동 검증 포함) | 30 |
+| ✅ parity (자동 검증 포함) | 31 |
 | 🖥️ Windows 실기기 검증 대기 (기능 자체는 구현 완료) | 6 (16,17,34,35,36,37) |
 | ⚠️ 의도적 변경 (사용자 인지) | 6 (5,8은 버그 수정 포함, 15,33,39 + 자동완성 지연) |
 | ➕ 신규 | 8 |
-| 미완 (후속) | 1 (#7 연관 검색어 UI 노출) |
+| 미완 (후속) | 0 |
 
 **체크리스트 100% 통과 정의**: ✅ 행 전부 자동 테스트 그린 + 🖥️ 행 전부 Windows 시나리오(S12,S18,S19) 통과 + ⚠️ 행 사용자 승인.
 현재 자동 부분 그린(294 passed). Windows 행은 스파이크 A/B와 함께 사용자 머신에서 확인 예정.

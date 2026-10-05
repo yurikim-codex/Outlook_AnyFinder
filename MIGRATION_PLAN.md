@@ -894,6 +894,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 - **4-5** `docs/MANUAL_TEST_SCENARIOS.md` — 시나리오 20종 (mock 가능 16 / Windows 전용 4), 자동 대응 매핑
 - **4-6** `ROLLBACK.md` + `tools/rollback_to_legacy.ps1` + `tools/rollback_check.py` (샌드박스 실실행 ✅, Windows 드릴 S20 대기)
 - 테스트 291 → **294 passed**, doctor 34/34 유지
+- **4-1 후속(트랙 A1)**: 연관 검색어 칩(`RelatedChips`, 결과 상단 — 클릭 시 재검색) 노출로 체크리스트 미완 행 해소(#7 ✅, 미완 0)
 
 **의도적 편차 (사용자 검토 요청)** — 상세 근거는 `src-tauri/README.md` 말미:
 1. 계획서의 타입 명시 `commands/{search,mail,index,sync,system}.rs` 대신 **제네릭 패스스루 `sidecar_request` 1개** — 계약 이중화 방지, 타입 안정성은 TS 래퍼(`frontend/src/lib/api.ts`)에서 확보

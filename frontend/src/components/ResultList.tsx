@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, MailOpen, SearchX } from "lucide-react";
 import { useApp } from "../lib/store";
 import type { SearchItem } from "../lib/types";
 import { MailCard } from "./MailCard";
+import { RelatedChips } from "./RelatedChips";
 
 export function ResultList() {
   const { search, doSearch, selected, selectItem, status } = useApp();
@@ -28,6 +29,7 @@ export function ResultList() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <RelatedChips />
       <div ref={parentRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
         {!status.ready && (
           <div className="flex h-full items-center justify-center text-[13px] text-faint">
