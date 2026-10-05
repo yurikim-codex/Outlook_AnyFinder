@@ -118,14 +118,15 @@ powershell -ExecutionPolicy Bypass -File sidecar\build_sidecar.ps1
 
 ---
 
-## 5. Command 목록 (42개)
+## 5. Command 목록 (43개)
 
-### system (5)
+### system (6)
 
 | cmd | params | result |
 |---|---|---|
 | `system.hello` | — | `{sidecar_version, protocol_version, python_version, platform, pid, use_mock, db_path, db_ok, db_error, outlook_ok, outlook_note, commands_count, started_at, utf8_io, stdout_protected}` — **DB가 깨져 있어도 성공** |
 | `system.ping` | — | `{pong, ts}` |
+| `system.info` | — | `{sidecar_version, protocol_version, schema_version, commands_count, python, platform, mock, data_dir, db_path}` — 프런트엔드 버전 불일치 감지용 경량 조회 (Phase 4-4) |
 | `system.shutdown` | — | `{ok, message}` — 응답 전송 후 프로세스 정상 종료 (exit 0) |
 | `system.commands` | — | `{commands: [...], count}` |
 | `system.debug.print` | `{text?}` | `{ok, printed, stdout_protected}` — stdout 오염 방어 검증용 |

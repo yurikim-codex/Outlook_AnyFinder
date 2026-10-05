@@ -15,6 +15,7 @@ import {
 
 import * as api from "./api";
 import { getTransport, isTauri, SidecarError } from "./transport";
+import { compareSemver, PROTOCOL_VERSION, SIDECAR_VERSION_MIN } from "./version";
 import type {
   AppSettings,
   Bookmark,
@@ -27,6 +28,7 @@ import type {
   SearchParams,
   SearchResponse,
   SidecarStatus,
+  SystemInfo,
   ThemeId,
 } from "./types";
 
@@ -68,6 +70,8 @@ interface AppContextValue {
   toasts: Toast[];
   dialog: null | "settings" | "sync";
   firstRun: boolean;
+  systemInfo: SystemInfo | null;
+  versionWarning: string | null;
   // actions
   doSearch: (patch: Partial<SearchParams>, opts?: { resetPage?: boolean }) => Promise<void>;
   selectItem: (item: SearchItem | null) => void;
@@ -118,6 +122,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [dialog, setDialog] = useState<null | "settings" | "sync">(null);
   const [firstRun, setFirstRun] = useState(false);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [versionWarning, setVersionWarning] = useState<string | null>(null);
 
   const bootstrapped = useRef(false);
   const searchSeq = useRef(0);
@@ -167,9 +173,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const { settings: loaded } = await api.settingsGet(transport);
       setSettings(loaded);
+
+      // Phase 4-3: 레거시 config.json 기본값을 초기 검색 파라미터에 반영
+      const sortMap: Record<string, SearchParams["sort_by"]> = {
+        relevance: "rank",
+        newest: "newest",
+        oldest: "oldest",
+      };
+      paramsRef.current = {
+        ...paramsRef.current,
+        per_page: Number(loaded.search?.results_per_page ?? 20),
+        contains_search: loaded.search?.contains_search !== false,
+        sort_by: sortMap[String(loaded.search?.default_sort ?? "relevance")] ?? "rank",
+      };
+      setSearch((prev) => ({ ...prev, params: { ...prev.params, ...paramsRef.current } }));
+
+      // Phase 4-4: 사이드카/프런트 버전 불일치 감지
+      try {
+        const info = await api.systemInfo(transport);
+        setSystemInfo(info);
+        if (info.protocol_version !== PROTOCOL_VERSION) {
+          setVersionWarning(
+            `사이드카 프로토콜 v${info.protocol_version} ≠ 프런트엔드 v${PROTOCOL_VERSION} — 앱 업데이트가 필요합니다`,
+          );
+        } else if (compareSemver(info.sidecar_version, SIDECAR_VERSION_MIN) < 0) {
+          setVersionWarning(
+            `사이드카 ${info.sidecar_version}이 최소 지원 버전(${SIDECAR_VERSION_MIN})보다 오래되었습니다`,
+          );
+        }
+      } catch {
+        /* system.info 미지원 구버전 사이드카 — 무시 */
+      }
+
       await refreshMeta();
       await refreshBookmarks();
-      if ((loaded.first_run_completed === false || !loaded.first_run_completed) ) {
+      if (loaded.first_run_completed === false || !loaded.first_run_completed) {
         const s = await api.dbStats(transport);
         if (s.email_count === 0) setFirstRun(true);
       }
@@ -396,7 +434,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!readyRef.current || !settingsRef.current) return;
       const sync = settingsRef.current.sync;
       if (sync?.auto_sync !== true) return;
-      const intervalMin = Number(sync.auto_sync_interval_minutes ?? 30);
+      const intervalMin = Number(sync.interval_minutes ?? 10);
       const last = statsRef.current?.last_sync_time;
       if (!last) return; // 동기화 이력 없으면 자동 시작하지 않음 (첫 sync는 사용자 동작)
       const dueAt = new Date(last.replace(" ", "T")).getTime() + intervalMin * 60_000;
@@ -436,6 +474,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toasts,
     dialog,
     firstRun,
+    systemInfo,
+    versionWarning,
     doSearch,
     selectItem,
     openDialog: setDialog,

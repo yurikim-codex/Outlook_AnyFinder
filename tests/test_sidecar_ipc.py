@@ -48,9 +48,11 @@ class SidecarProcess:
     - stderr는 drain 스레드가 계속 비운다 (파이프 버퍼 블로킹 방지 — Windows 교훈 #5)
     """
 
-    def __init__(self, data_dir=None, extra_args=(), env_extra=None, keep_env_io=False):
+    def __init__(self, data_dir=None, extra_args=(), env_extra=None, keep_env_io=False,
+                 keep_dir=False):
         self.data_dir = Path(data_dir or tempfile.mkdtemp(prefix="anyfinder-sc-test-"))
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.keep_dir = keep_dir  # True면 close() 시 디렉터리를 보존 (재기동 테스트용)
         self.events = []
         self.junk_lines = []
         self.stderr_bytes = []
@@ -168,7 +170,8 @@ class SidecarProcess:
                 self.proc.wait(timeout=5)
         except Exception:
             pass
-        shutil.rmtree(self.data_dir, ignore_errors=True)
+        if not self.keep_dir:
+            shutil.rmtree(self.data_dir, ignore_errors=True)
 
 
 @pytest.fixture
@@ -508,7 +511,7 @@ class TestSidecarLifecycle:
         assert r["result"]["count"] == len(cmds) >= 30
         # 계약서(§6.2) 핵심 명령이 모두 등록되어 있어야 한다
         for required in ("system.hello", "system.shutdown", "db.stats", "db.reset",
-                         "db.clear_history", "db.reset_all",
+                         "db.clear_history", "db.reset_all", "system.info",
                          "search.query", "search.folders", "search.related",
                          "autocomplete.suggest", "sync.plan", "sync.execute", "sync.cancel",
                          "bookmark.list", "bookmark.add", "bookmark.remove",
@@ -1077,3 +1080,85 @@ class TestSidecarDbFailure:
                 proc.close()
         finally:
             blocker_path.unlink(missing_ok=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Phase 4 — Parity / 마이그레이션 회귀
+# ═══════════════════════════════════════════════════════════════
+
+class TestPhase4Parity:
+    """4-2 재색인 없음 / 4-3 레거시 config 단일 스키마 / 4-4 버전 계약."""
+
+    def test_18_system_info_version_contract(self, sc):
+        r = sc.request("system.info")
+        assert r["ok"] is True
+        info = r["result"]
+        for key in ("sidecar_version", "protocol_version", "schema_version",
+                    "commands_count", "python", "platform", "mock", "data_dir", "db_path"):
+            assert key in info, f"system.info 필드 누락: {key}"
+        assert info["protocol_version"] == "1.0"
+        parts = [int(x) for x in info["sidecar_version"].split(".")]
+        assert parts >= [1, 1, 0], "사이드카 버전은 프런트 최소 지원 버전(1.1.0) 이상"
+        cmds = sc.request("system.commands")["result"]
+        assert info["commands_count"] == cmds["count"] == len(cmds["commands"])
+        assert info["mock"] is True
+
+    def test_19_legacy_config_single_schema(self):
+        """레거시(utils/config.py) 스키마 config.json을 사이드카가 그대로 읽고,
+        로드시 파일을 재작성하지 않으며(롤백 안전), 누락 키만 기본값 보강."""
+        legacy = {
+            "indexing": {"folders": ["받은편지함"], "folder_ids": [6],
+                         "include_subfolders": False, "range_months": 3},
+            "sync": {"auto_sync": True, "interval_minutes": 5},
+            "search": {"results_per_page": 20, "default_sort": "newest"},
+            "ui": {"theme": "light"},
+            "first_run_completed": True,
+        }
+        with tempfile.TemporaryDirectory(prefix="anyfinder-cfg-") as td:
+            dd = Path(td)
+            cfg = dd / "config.json"
+            cfg.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
+            before = cfg.read_text(encoding="utf-8")
+            proc = SidecarProcess(data_dir=dd)
+            try:
+                proc.wait_ready()
+                st = proc.request("settings.get")["result"]["settings"]
+                # 레거시 키 보존 (단일 스키마 — 키 이름 변경 금지)
+                assert st["indexing"]["folder_ids"] == [6]
+                assert st["indexing"]["include_subfolders"] is False
+                assert st["indexing"]["range_months"] == 3
+                assert st["sync"]["interval_minutes"] == 5
+                assert st["ui"]["theme"] == "light"
+                assert st["first_run_completed"] is True
+                # 누락 키는 DEFAULT_CONFIG로 보강 (깊은 머지)
+                assert st["search"]["max_autocomplete_items"] == 8
+                assert st["sync"]["auto_sync"] is True
+                # 로드만으로는 파일을 재작성하지 않는다 (레거시와 공존 가능)
+                assert cfg.read_text(encoding="utf-8") == before
+            finally:
+                proc.close()
+
+    def test_20_existing_index_reused_without_reindex(self):
+        """4-2 완료 기준: 기존 사용자 DB로 재색인 없이 검색 동작."""
+        with tempfile.TemporaryDirectory(prefix="anyfinder-reidx-") as td:
+            dd = Path(td)
+            first = SidecarProcess(data_dir=dd, keep_dir=True)
+            try:
+                first.wait_ready()
+                built = first.request("index.build")["result"]
+                assert built["added"] == MOCK_TOTAL
+                stats = first.request("db.stats")["result"]
+                assert stats["email_count"] == MOCK_TOTAL
+            finally:
+                first.close()
+
+            second = SidecarProcess(data_dir=dd)
+            try:
+                second.wait_ready()
+                stats2 = second.request("db.stats")["result"]
+                assert stats2["email_count"] == MOCK_TOTAL, "기존 인덱스가 그대로 보여야 한다"
+                q = second.request("search.query", {"query": "", "per_page": 5})["result"]
+                assert q["total_count"] == MOCK_TOTAL, "재색인 없이 검색 가능"
+                assert q["total_db_count"] == MOCK_TOTAL
+            finally:
+                second.close()

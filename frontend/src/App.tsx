@@ -9,14 +9,20 @@ import { Toasts } from "./components/Toasts";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SyncFolderDialog } from "./components/SyncFolderDialog";
 import { FirstRunDialog } from "./components/FirstRunDialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 
 function Shell() {
-  const { status, dialog, firstRun, transportKind } = useApp();
+  const { status, dialog, firstRun, transportKind, versionWarning } = useApp();
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <Header />
+      {versionWarning && (
+        <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--mark-bg)] px-4 py-1.5 text-xs text-[var(--warn)]">
+          <AlertTriangle size={13} className="shrink-0" />
+          {versionWarning}
+        </div>
+      )}
       {!status.ready && (
         <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--bg-elev)] px-4 py-1.5 text-xs text-dim">
           <Loader2 size={13} className="animate-spin" />

@@ -14,12 +14,14 @@ import type {
   SearchResponse,
   SyncPlanView,
   SyncStats,
+  SystemInfo,
 } from "./types";
 
 // ── system ──
 export const systemPing = (t: Transport) => t.request<{ pong: boolean }>("system.ping");
 export const systemCommands = (t: Transport) =>
   t.request<{ commands: string[] }>("system.commands");
+export const systemInfo = (t: Transport) => t.request<SystemInfo>("system.info");
 
 // ── search ──
 export const searchQuery = (t: Transport, params: SearchParams) =>

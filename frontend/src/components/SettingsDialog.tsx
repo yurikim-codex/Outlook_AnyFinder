@@ -24,7 +24,9 @@ export function SettingsDialog() {
   const [confirmReset, setConfirmReset] = useState(false);
   const transport = getTransport();
 
+  // config.json 단일 스키마 (legacy utils/config.py 호환) — 키 이름 변경 금지
   const sync = settings?.sync ?? {};
+  const indexing = settings?.indexing ?? {};
   const search = settings?.search ?? {};
   const ui = settings?.ui ?? {};
 
@@ -112,10 +114,10 @@ export function SettingsDialog() {
             자동 동기화 간격
             <select
               className="input px-2 py-1"
-              value={Number(sync.auto_sync_interval_minutes ?? 30)}
-              onChange={(e) => void updateSettings({ sync: { auto_sync_interval_minutes: Number(e.target.value) } })}
+              value={Number(sync.interval_minutes ?? 10)}
+              onChange={(e) => void updateSettings({ sync: { interval_minutes: Number(e.target.value) } })}
             >
-              {[10, 15, 30, 60, 120].map((m) => (
+              {[5, 10, 15, 30, 60, 120].map((m) => (
                 <option key={m} value={m}>
                   {m}분
                 </option>
@@ -126,8 +128,8 @@ export function SettingsDialog() {
             기본 동기화 기간
             <select
               className="input px-2 py-1"
-              value={Number(sync.range_months ?? 0)}
-              onChange={(e) => void updateSettings({ sync: { range_months: Number(e.target.value) } })}
+              value={Number(indexing.range_months ?? 6)}
+              onChange={(e) => void updateSettings({ indexing: { range_months: Number(e.target.value) } })}
             >
               <option value={0}>전체</option>
               <option value={1}>1개월</option>
@@ -139,8 +141,8 @@ export function SettingsDialog() {
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={sync.include_subfolders !== false}
-              onChange={(e) => void updateSettings({ sync: { include_subfolders: e.target.checked } })}
+              checked={indexing.include_subfolders !== false}
+              onChange={(e) => void updateSettings({ indexing: { include_subfolders: e.target.checked } })}
             />
             하위 폴더 포함
           </label>
@@ -161,14 +163,26 @@ export function SettingsDialog() {
             페이지당 결과 수
             <select
               className="input px-2 py-1"
-              value={Number(search.per_page ?? 50)}
-              onChange={(e) => void updateSettings({ search: { per_page: Number(e.target.value) } })}
+              value={Number(search.results_per_page ?? 20)}
+              onChange={(e) => void updateSettings({ search: { results_per_page: Number(e.target.value) } })}
             >
               {[20, 50, 100, 200, 500].map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            기본 정렬
+            <select
+              className="input px-2 py-1"
+              value={String(search.default_sort ?? "relevance")}
+              onChange={(e) => void updateSettings({ search: { default_sort: e.target.value } })}
+            >
+              <option value="relevance">관련도순</option>
+              <option value="newest">최신순</option>
+              <option value="oldest">오래된순</option>
             </select>
           </label>
           <label className="flex items-center gap-2">

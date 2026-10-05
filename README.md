@@ -6,8 +6,8 @@
 > 🚧 **React + Tauri 전환 진행 중** — [MIGRATION_PLAN.md](./MIGRATION_PLAN.md)
 > - 기존 PyQt6 UI(`ui/`, `main.py`)는 `legacy_pyqt/`로 이동했습니다 (전환 완료 시까지 롤백용으로 보존).
 > - 비즈니스 로직(`core/`, `data/`, `utils/`)은 무수정 유지되며, 새 `sidecar/`(JSON Lines IPC 프로세스)에서 그대로 재사용됩니다.
-> - 사이드카 검증: `py -3 -m pytest tests/ -q` (291 passed) / `py -3 sidecar\dev_client.py --doctor` (34/34)
-> - Phase 2(Rust 코어)·Phase 3(React UI) 코드 반영 완료 — Rust는 Windows에서 컴파일 검증 필요(`src-tauri/README.md`)
+> - 사이드카 검증: `py -3 -m pytest tests/ -q` (294 passed) / `py -3 sidecar\dev_client.py --doctor` (34/34)
+> - Phase 2(Rust 코어)·Phase 3(React UI)·Phase 4(Parity 자동 검증) 반영 완료 — Rust/Windows 수동 검증은 `src-tauri/README.md`, `PARITY_CHECKLIST.md`, `ROLLBACK.md` 참고
 
 ---
 

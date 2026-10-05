@@ -12,5 +12,5 @@ stdin/stdout JSON Lines 프로토콜로 통신한다 (계약서: sidecar/README.
 ★ 비즈니스 로직은 core/ data/ utils/ 를 무수정 재사용한다 (계획 §4).
 """
 
-__version__ = "0.9.1"
+__version__ = "1.1.0"
 PROTOCOL_VERSION = "1.0"

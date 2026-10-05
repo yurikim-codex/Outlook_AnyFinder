@@ -107,28 +107,55 @@ export interface DbStats {
 
 export type ThemeId = "dark" | "light" | "warm-dark";
 
+/**
+ * config.json 스키마 — **legacy(utils/config.py)와 단일 스키마 유지** (Phase 4-3).
+ * 롤백 시 PyQt6 판이 그대로 읽을 수 있어야 하므로 키 이름/구조를 바꾸지 않는다.
+ * 새 UI 전용 키는 기본값과 함께 추가만 한다 (search.contains_search 등).
+ */
 export interface AppSettings {
-  ui?: {
-    theme?: ThemeId;
-    font_scale?: number;
-    preview_font_size?: number;
+  indexing?: {
+    folders?: string[];
+    folder_ids?: number[];
+    include_subfolders?: boolean;
+    range_months?: number;
     [key: string]: unknown;
   };
   sync?: {
     auto_sync?: boolean;
-    auto_sync_interval_minutes?: number;
-    range_months?: number;
-    include_subfolders?: boolean;
-    folder_ids?: number[];
+    interval_minutes?: number;
     [key: string]: unknown;
   };
   search?: {
-    per_page?: number;
+    results_per_page?: number;
+    default_sort?: "relevance" | "newest" | "oldest";
+    autocomplete_delay_ms?: number;
+    max_autocomplete_items?: number;
+    max_related_keywords?: number;
+    /** 새 UI 전용 추가 키 — 기본 true ("정확한 단어만" 미체크) */
     contains_search?: boolean;
+    [key: string]: unknown;
+  };
+  ui?: {
+    theme?: ThemeId;
+    sidebar_width?: number;
+    preview_ratio?: number;
     [key: string]: unknown;
   };
   first_run_completed?: boolean;
   [key: string]: unknown;
+}
+
+/** system.info 응답 (Phase 4-4 버전 불일치 감지용) */
+export interface SystemInfo {
+  sidecar_version: string;
+  protocol_version: string;
+  schema_version: number | string | null;
+  commands_count: number;
+  python: string;
+  platform: string;
+  mock: boolean;
+  data_dir: string;
+  db_path: string;
 }
 
 // ── 동기화 / 인덱싱 ──

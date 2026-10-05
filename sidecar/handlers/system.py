@@ -13,6 +13,7 @@ def register(dispatcher):
     dispatcher.register("system.ping", ping)
     dispatcher.register("system.shutdown", shutdown)
     dispatcher.register("system.commands", commands)
+    dispatcher.register("system.info", info)
     dispatcher.register("system.debug.print", debug_print)
 
 
@@ -60,6 +61,38 @@ def hello(state, params, ctx):
 
 def ping(state, params, ctx):
     return {"pong": True, "ts": datetime.now().isoformat(timespec="milliseconds")}
+
+
+def info(state, params, ctx):
+    """경량 버전/환경 조회 — 프런트엔드 버전 불일치 감지용 (계획 Phase 4-4).
+
+    hello와 달리 DB 상태를 건드리지 않는다 (schema_version은 best-effort).
+    """
+    from sidecar import PROTOCOL_VERSION, __version__
+
+    schema_version = None
+    try:
+        def work(conn):
+            row = conn.execute(
+                "SELECT value FROM sync_meta WHERE key='schema_version'"
+            ).fetchone()
+            return row["value"] if row else None
+
+        schema_version = state.in_db(work)
+    except Exception:
+        schema_version = None
+
+    return {
+        "sidecar_version": __version__,
+        "protocol_version": PROTOCOL_VERSION,
+        "schema_version": schema_version,
+        "commands_count": len(ctx["dispatcher"]),
+        "python": sys.version.split()[0],
+        "platform": sys.platform,
+        "mock": state.use_mock,
+        "data_dir": str(state.data_dir),
+        "db_path": str(state.db_path),
+    }
 
 
 def shutdown(state, params, ctx):

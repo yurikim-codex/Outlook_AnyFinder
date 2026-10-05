@@ -37,7 +37,9 @@ export function Header() {
     useApp();
 
   const [query, setQuery] = useState(search.params.query);
-  const [exactOnly, setExactOnly] = useState(!search.params.contains_search);
+  // 설정(search.contains_search)과 양방향 동기 — bootstrap이 config 기본값을 주입한다
+  const exactOnly = search.params.contains_search === false;
+  const setExactOnly = (v: boolean) => void doSearch({ contains_search: !v });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggest, setShowSuggest] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -131,10 +133,7 @@ export function Header() {
               <input
                 type="checkbox"
                 checked={exactOnly}
-                onChange={(e) => {
-                  setExactOnly(e.target.checked);
-                  void doSearch({ contains_search: !e.target.checked });
-                }}
+                onChange={(e) => setExactOnly(e.target.checked)}
               />
               정확한 단어만
             </label>

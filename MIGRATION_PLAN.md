@@ -639,11 +639,11 @@ py sidecar\dev_client.py 'search.query {"query":"보고서"}'
 
 | Phase | 내용 | 집중 투입 | 파트타임 | 진행 |
 |---|---|---|---|---|
-| 0 | 준비 + 스파이크 | 3일 | 1주 | 🟡 부분 (0-6 완료) |
+| 0 | 준비 + 스파이크 | 3일 | 1주 | 🟡 부분 (0-6 완료, A/B는 Windows 대기) |
 | 1 | IPC + 사이드카 | 4일 | 1주 | 🟢 **완료** |
-| 2 | Tauri Rust | 1주 | 1.5주 | ⬜ |
-| 3 | React UI | **2주** | **3주** | ⬜ |
-| 4 | Parity | 4일 | 1주 | ⬜ |
+| 2 | Tauri Rust | 1주 | 1.5주 | 🟢 코드 완료 (컴파일은 Windows 검증 대기) |
+| 3 | React UI | **2주** | **3주** | 🟢 **완료** (빌드/스모크 그린) |
+| 4 | Parity | 4일 | 1주 | 🟡 자동 검증 완료 — Windows 수동(S12,S18,S19,S20) 대기 |
 | 5 | 패키징/배포 | 5일 | 1주 | ⬜ |
 | **합계** | | **약 5주** | **약 9주** | **약 25%** |
 
@@ -884,6 +884,16 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 - **Phase 2/3 추가분**: 명령 40→**42** (`db.clear_history`, `db.reset_all{confirm:true}` — 설정>데이터 탭), 사이드카 테스트 91→**93** (전체 291 passed)
 - 브라우저 개발 모드: `frontend/dev_bridge.py`(표준 라이브러리 HTTP+SSE 브리지, 127.0.0.1:8765, mock 기본) + vite `/sidecar` 프록시 — Rust 없이 UI 전체 개발/스모크 가능
 - 부록 B 핀 대비 실제 확정: `@vitejs/plugin-react` 5.x (6.x는 Vite 8 전용), Pretendard는 `@fontsource/pretendard`(정적) — fontsource에 variable 패키지가 없음, lucide-react 0.469 고정(1.x 회피)
+
+### Phase 4 반영분 (2026-10-05)
+
+- **4-1** `PARITY_CHECKLIST.md` — legacy 기능 40행 1:1 대조 (자동 30 / Windows 대기 6 / 의도적 변경 6 / 신규 8 / 후속 1)
+- **4-2** 재색인 없음 회귀 고정: `test_20_existing_index_reused_without_reindex` (같은 DB 재기동 → 즉시 검색)
+- **4-3** **config.json 단일 스키마 확정** — 신UI가 레거시 키 이름(`indexing.*`, `sync.interval_minutes`, `search.results_per_page/default_sort`)을 그대로 사용. 프런트 기존 시안 키는 폐기. 회귀: `test_19_legacy_config_single_schema` (로드만으로는 파일 재작성 없음 = 레거시 공존)
+- **4-4** `system.info` 명령 추가(43개) + 프런트 버전 게이트(`frontend/src/lib/version.ts`, 프로토콜/최소 사이드카 버전 불일치 시 배너). 회귀: `test_18_system_info_version_contract`
+- **4-5** `docs/MANUAL_TEST_SCENARIOS.md` — 시나리오 20종 (mock 가능 16 / Windows 전용 4), 자동 대응 매핑
+- **4-6** `ROLLBACK.md` + `tools/rollback_to_legacy.ps1` + `tools/rollback_check.py` (샌드박스 실실행 ✅, Windows 드릴 S20 대기)
+- 테스트 291 → **294 passed**, doctor 34/34 유지
 
 **의도적 편차 (사용자 검토 요청)** — 상세 근거는 `src-tauri/README.md` 말미:
 1. 계획서의 타입 명시 `commands/{search,mail,index,sync,system}.rs` 대신 **제네릭 패스스루 `sidecar_request` 1개** — 계약 이중화 방지, 타입 안정성은 TS 래퍼(`frontend/src/lib/api.ts`)에서 확보

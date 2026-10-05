@@ -22,8 +22,8 @@ export function SyncFolderDialog() {
 
   const [folders, setFolders] = useState<FolderOpt[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [includeSub, setIncludeSub] = useState(settings?.sync?.include_subfolders !== false);
-  const [rangeMonths, setRangeMonths] = useState(Number(settings?.sync?.range_months ?? 0));
+  const [includeSub, setIncludeSub] = useState(settings?.indexing?.include_subfolders !== false);
+  const [rangeMonths, setRangeMonths] = useState(Number(settings?.indexing?.range_months ?? 6));
   const [incremental, setIncremental] = useState(false);
   const [step, setStep] = useState<Step>("options");
   const [plan, setPlan] = useState<SyncPlanView | null>(null);
