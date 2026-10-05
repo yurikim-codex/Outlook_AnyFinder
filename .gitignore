@@ -81,3 +81,6 @@ frontend/dist/
 src-tauri/target/
 src-tauri/gen/
 src-tauri/resources/sidecar/
+
+# Tauri updater signing keys (비밀키 — 커밋 금지)
+tools/updater-keys/

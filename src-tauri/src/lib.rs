@@ -28,6 +28,8 @@ pub fn run() {
         }))
         // 창 크기/위치 기억
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        // 자동 업데이트 (Phase 5-6) — GitHub Releases latest.json 엔드포인트
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
             logging::init(&handle);

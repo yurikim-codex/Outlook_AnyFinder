@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "OutLook AnyFinder",
-  "version": "0.9.1",
+  "version": "1.0.0",
   "identifier": "com.sesung.outlook-anyfinder",
   "build": {
     "beforeDevCommand": "npm run dev --prefix frontend",
@@ -24,13 +24,18 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://github.com https://objects.githubusercontent.com"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "resources": ["resources/sidecar/**/*"],
+    "createUpdaterArtifacts": true,
+    "targets": [
+      "nsis"
+    ],
+    "resources": [
+      "resources/sidecar/**/*"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -42,10 +47,37 @@
         "type": "offlineInstaller",
         "silent": true
       },
+      "signCommand": {
+        "cmd": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "tools/sign-one.ps1",
+          "%1"
+        ]
+      },
       "nsis": {
-        "languages": ["Korean", "English"],
+        "installerHooks": "nsis/hooks.nsi",
+        "startMenuFolder": "OutLook AnyFinder",
+        "languages": [
+          "Korean",
+          "English"
+        ],
         "installMode": "currentUser",
         "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/yurikim-codex/Outlook_AnyFinder/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI0NDlENTUwNzdFREIyOUUKUldTZXN1MTNVTlZKdEVqMzNieis1RUNFM0xuKzBOYk9FVzdNbUhRZ3hkUU82NVJrY044U2F6U3AK",
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

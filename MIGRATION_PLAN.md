@@ -644,7 +644,7 @@ py sidecar\dev_client.py 'search.query {"query":"보고서"}'
 | 2 | Tauri Rust | 1주 | 1.5주 | 🟢 코드 완료 (컴파일은 Windows 검증 대기) |
 | 3 | React UI | **2주** | **3주** | 🟢 **완료** (빌드/스모크 그린) |
 | 4 | Parity | 4일 | 1주 | 🟡 자동 검증 완료 — Windows 수동(S12,S18,S19,S20) 대기 |
-| 5 | 패키징/배포 | 5일 | 1주 | ⬜ |
+| 5 | 패키징/배포 | 5일 | 1주 | 🟡 설정/스크립트/문서 완료 — Windows 실빌드·VM 검증 대기 |
 | **합계** | | **약 5주** | **약 9주** | **약 25%** |
 
 **Phase 3(React UI) 이 전체의 40%** 입니다. 여기가 승부처입니다.
@@ -900,5 +900,18 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 2. `tauri-plugin-log` 대신 최소 std 파일 로깅 (`desktop.log`)
 3. **창 닫기 = 트레이 숨김** (legacy는 닫기=종료) — 트레이 배경 동기화를 위한 상주 정책 변경
 4. 미리보기는 `preview.mail`(평문 본문) 계약 사용 — HTML iframe 렌더 불필요(XSS 공격면 제거)
+
+### Phase 5 반영분 (2026-10-06)
+
+- **5-1/5-2** `sidecar/build_sidecar.ps1` 기존 유지(onedir+console+리소스 복사+exe 스모크) — 완료 기준 충족 확인
+- **5-3** NSIS 보강: `src-tauri/nsis/hooks.nsi` (설치/제거 전 프로세스 종료 = 좀비 0건, 제거 시 데이터 보존), startMenuFolder, `createUpdaterArtifacts: true`
+- **5-4** WebView2 `offlineInstaller`(silent) 유지 — 망분리 VM 대비
+- **5-5** 서명: `tools/create-cert.ps1`(사내 자기서명) + `tools/sign-one.ps1`(**tauri build signCommand 래퍼** — 빌드 내부 서명으로 업데이터 해시 일관성 보장, 인증서 없으면 SKIP) + `tools/sign.ps1`(개별 재서명용)
+- **5-6** 업데이터: `tauri-plugin-updater`(Rust+capability+conf endpoints=GitHub Releases) + 설정>업데이트 탭(확인/설치) + `tools/gen-updater-keys.mjs`(키쌍 생성+conf pubkey 자동 반영, 비밀키 gitignore) + `RELEASE.md` 전체 절차
+- **5-7** `docs/VM_TEST_CHECKLIST.md` — 클린 VM 검증 7그룹 30항목 (실기기 수행 대기)
+- **5-8** 문서: `실행_가이드.md` §23(신버전 설치/실행/업데이트/롤백), README, 부록 C
+- 버전 단일화: `tools/bump-version.mjs` (Cargo/conf/version.ts/__init__.py 4곳 일괄) — 현재 1.0.0
+
+**미완료(Windows 전용)**: tauri build 실물 확인, sign 실서명, VM 체크리스트, 스파이크 A/B, S12/S18/S19/S20.
 
 **문서 끝.**

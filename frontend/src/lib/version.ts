@@ -5,7 +5,7 @@
  *   사이드카 system.info.protocol_version과 다르면 UI는 경고 배너를 띄운다.
  * - SIDECAR_MIN/MAX: 이 프런트엔드가 동작을 보장하는 사이드카 버전 범위.
  */
-export const APP_VERSION = "1.0.0-react";
+export const APP_VERSION = "1.0.0";
 /** sidecar/__init__.py PROTOCOL_VERSION과 문자열 동등 비교 */
 export const PROTOCOL_VERSION = "1.0";
 export const SIDECAR_VERSION_MIN = "1.1.0";

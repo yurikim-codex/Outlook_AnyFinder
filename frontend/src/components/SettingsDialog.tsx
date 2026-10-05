@@ -1,14 +1,16 @@
 import { useState } from "react";
 import clsx from "clsx";
+import { RefreshCcw } from "lucide-react";
 
 import * as api from "../lib/api";
 import { formatCount, formatMb } from "../lib/format";
-import { getTransport } from "../lib/transport";
+import { getTransport, isTauri } from "../lib/transport";
 import { useApp } from "../lib/store";
+import { APP_VERSION } from "../lib/version";
 import type { ThemeId } from "../lib/types";
 import { Dialog } from "./Dialog";
 
-const TABS = ["인덱싱", "동기화", "검색", "화면", "데이터"] as const;
+const TABS = ["인덱싱", "동기화", "검색", "화면", "데이터", "업데이트"] as const;
 type Tab = (typeof TABS)[number];
 
 const THEMES: { id: ThemeId; label: string; desc: string }[] = [
@@ -18,11 +20,34 @@ const THEMES: { id: ThemeId; label: string; desc: string }[] = [
 ];
 
 export function SettingsDialog() {
-  const { openDialog, settings, stats, updateSettings, setTheme, refreshMeta, restartSidecar, toast, transportKind } =
+  const { openDialog, settings, stats, updateSettings, setTheme, refreshMeta, restartSidecar, toast, transportKind, systemInfo } =
     useApp();
   const [tab, setTab] = useState<Tab>("인덱싱");
   const [confirmReset, setConfirmReset] = useState(false);
+  const [updateState, setUpdateState] = useState<string>("");
   const transport = getTransport();
+
+  const checkUpdate = async () => {
+    if (!isTauri) {
+      toast("업데이트 확인은 설치본(Tauri)에서만 가능합니다", "warn");
+      return;
+    }
+    setUpdateState("업데이트 확인 중…");
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (!update) {
+        setUpdateState("최신 버전입니다.");
+        return;
+      }
+      setUpdateState(`새 버전 ${update.version} 발견 — 다운로드/설치 중…`);
+      await update.downloadAndInstall();
+      setUpdateState("설치 완료 — 앱 재시작 후 적용됩니다.");
+      toast("업데이트 설치 완료 — 앱을 재시작하세요", "success");
+    } catch (e) {
+      setUpdateState(`업데이트 확인 실패: ${String(e)}`);
+    }
+  };
 
   // config.json 단일 스키마 (legacy utils/config.py 호환) — 키 이름 변경 금지
   const sync = settings?.sync ?? {};
@@ -266,6 +291,24 @@ export function SettingsDialog() {
               </div>
             )}
           </div>
+        </div>
+      )}
+      {tab === "업데이트" && (
+        <div className="space-y-3 text-[13px]">
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-[var(--border)] p-3 text-[12px]">
+            <div>프런트엔드: <b>v{APP_VERSION}</b></div>
+            <div>사이드카: <b>v{systemInfo?.sidecar_version ?? "-"}</b></div>
+            <div>프로토콜: v{systemInfo?.protocol_version ?? "-"}</div>
+            <div>구동 모드: {transportKind === "tauri" ? "Tauri 설치본" : "브라우저 개발"}</div>
+          </div>
+          <button className="btn btn-primary" onClick={() => void checkUpdate()} disabled={!!updateState && updateState.includes("중…")}>
+            <RefreshCcw size={14} /> 업데이트 확인
+          </button>
+          {updateState && <p className="text-[12px] text-dim">{updateState}</p>}
+          <p className="text-[12px] text-faint">
+            업데이트는 GitHub Releases의 latest.json을 확인합니다 (릴리스 절차: RELEASE.md).
+            브라우저 개발 모드에서는 확인 버튼이 비활성 경로로 안내합니다.
+          </p>
         </div>
       )}
     </Dialog>
