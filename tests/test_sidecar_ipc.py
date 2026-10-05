@@ -508,6 +508,7 @@ class TestSidecarLifecycle:
         assert r["result"]["count"] == len(cmds) >= 30
         # 계약서(§6.2) 핵심 명령이 모두 등록되어 있어야 한다
         for required in ("system.hello", "system.shutdown", "db.stats", "db.reset",
+                         "db.clear_history", "db.reset_all",
                          "search.query", "search.folders", "search.related",
                          "autocomplete.suggest", "sync.plan", "sync.execute", "sync.cancel",
                          "bookmark.list", "bookmark.add", "bookmark.remove",
@@ -655,6 +656,34 @@ class TestSidecarDbAndSettings:
         r = indexed.request("db.stats")
         assert r["result"]["email_count"] == 0
         # 테스트 격리를 위해 다시 인덱싱 (module-scoped fixture 공유)
+        r = indexed.request("index.build", {"folder_ids": [6, 5]}, timeout=60)
+        assert r["ok"] and r["result"]["added"] == MOCK_TOTAL
+
+    def test_16_clear_history_keeps_bookmarks(self, sc):
+        sc.request("search.record", {"keyword": "히스토리테스트"})
+        sc.request("bookmark.add", {"name": "유지북마크", "query": "keep"})
+        r = sc.request("db.clear_history")
+        assert r["ok"] and r["result"]["cleared_history"] >= 1
+        assert sc.request("search.history")["result"]["items"] == []
+        # 북마크는 유지된다
+        assert sc.request("bookmark.list")["result"]["count"] == 1
+
+    def test_17_reset_all_requires_confirm(self, indexed):
+        """db.reset_all은 confirm=true 없으면 거부 — 전체 초기화 후 상태 검증."""
+        r = indexed.request("db.reset_all", {})
+        assert r["ok"] is False and r["error"]["code"] == "INVALID_PARAMS"
+
+        indexed.request("bookmark.add", {"name": "삭제대상", "query": "x"})
+        r = indexed.request("db.reset_all", {"confirm": True})
+        assert r["ok"] and r["result"]["ok"] is True and r["result"]["email_count"] == 0
+
+        stats = indexed.request("db.stats")["result"]
+        assert stats["email_count"] == 0 and stats["bookmark_count"] == 0
+        assert stats["schema_version"] in (1, "1")  # reset 후에도 schema_version 재기록
+        # first_run_completed=false가 설정 파일에 기록됨
+        cfg = json.loads((indexed.data_dir / "config.json").read_text(encoding="utf-8"))
+        assert cfg["first_run_completed"] is False
+        # 검색/인덱싱이 다시 정상 동작해야 한다 (module fixture 복구)
         r = indexed.request("index.build", {"folder_ids": [6, 5]}, timeout=60)
         assert r["ok"] and r["result"]["added"] == MOCK_TOTAL
 

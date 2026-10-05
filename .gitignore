@@ -72,3 +72,12 @@ desktop.ini
 
 # User-specific config backups / local-only files
 config.local.json
+
+# Node (React 프런트엔드 / Tauri CLI)
+node_modules/
+frontend/dist/
+
+# Tauri build outputs
+src-tauri/target/
+src-tauri/gen/
+src-tauri/resources/sidecar/

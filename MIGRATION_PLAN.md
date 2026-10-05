@@ -873,11 +873,22 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 | 0-4/0-5 | ⬜ 스파이크 A(Tauri hello-world)/B(실 Outlook STA 100회)는 **Windows 실기기 필요** |
 | 0-6 | ✅ 스파이크 C — `search.query` IPC 경유 실행 성공 (Linux/Mock, 통합 테스트로 고정) |
 | 1 | ✅ **저장소 기준으로 계약 재구현 완료**: 명령 40개, `sidecar/` 15개 파일, `tests/test_sidecar_ipc.py` 91개. 전체 **289 passed** (198+91, 회귀 0), `dev_client --doctor` **34/34**. 계획서 Phase 1의 Windows 버그 수정(cp949 UTF-8 강제, SIGBREAK, fd 레벨 stdout 보호, stderr drain)과 잠재 버그 3건(북마크 삭제 반환값, dict 스냅샷, 다중 폴더 OR) 전부 반영. ※ 로컬 Windows에 별도 Phase 1 구현이 있다면 이 저장소 버전과 대조 필요 |
-| 2~5 | ⬜ 미착수 — 다음 단계 (Phase 2: `src-tauri/`, Phase 3: `frontend/`) |
+| 2 | ✅ 코드 완성 — **컴파일 미검증(샌드박스 Rust 툴체인 차단, Windows 검증 대기)**: `src-tauri/` Rust 모듈 8개(lib/sidecar/protocol/commands/tray/logging/error/main) + `tauri.conf.json`(NSIS·Korean/English·offlineInstaller) + capabilities + 아이콘(PNG/ICO, 표준 라이브러리 생성기). 사이드카 생명주기 전체(spawn 플래그·reader 방어 파서·15초 헬스체크/재시작 5회 캡·shutdown→CTRL_BREAK→kill), 단일 인스턴스, 트레이(열기/동기화/종료), 창 상태 기억. 절차는 `src-tauri/README.md` |
+| 3 | ✅ `frontend/` — React 19.2 + Vite 7.3 + TS 5.9 + Tailwind 4 + @tanstack/react-virtual + lucide + Pretendard. 화면: 검색바(자동완성·"정확한 단어만")/필터칩(폴더 OR·첨부·기간·정렬)/가상 리스트+페이지네이션/미리보기 패널/사이드바(폴더·북마크·통계)/설정 5탭(데이터 관리 포함)/폴더 선택 동기화(plan→승인→execute+진행·취소)/첫 실 온보딩/토스트/상태바(자동 동기화 카운트다운)/3테마(dark·light·warm-dark). IPC 트랜스포트 추상화로 **Tauri 없이 브라우저 개발 가능**(`dev_bridge.py`+vite 프록시). `tsc --noEmit`·`vite build` 그린, jsdom 스모크(`npm run smoke`, 실 브리지 경유) PASS |
+| 4~5 | ⬜ 미착수 — 패리티 검증/데이터 마이그레이션 리허설, NSIS 패키징·서명·업데이터 |
 
 추가로 반영된 것:
 - `sync_meta.schema_version` 도입 (사이드카가 DB 열 때 자동 기록, `db.schema_version` 명령) — 구 REVIEW_REPORT §4.3 및 본 계획 리스크 4 대응
 - `db.backup` 명령 (sqlite3 backup API, WAL 안전) — 리스크 4의 마이그레이션 전 백업 대응
 - Mock 고정 날짜(2026-05-27) 타임밤 방지: 테스트/doctor는 기간 필터(range_months>0)를 쓰지 않도록 고정
+- **Phase 2/3 추가분**: 명령 40→**42** (`db.clear_history`, `db.reset_all{confirm:true}` — 설정>데이터 탭), 사이드카 테스트 91→**93** (전체 291 passed)
+- 브라우저 개발 모드: `frontend/dev_bridge.py`(표준 라이브러리 HTTP+SSE 브리지, 127.0.0.1:8765, mock 기본) + vite `/sidecar` 프록시 — Rust 없이 UI 전체 개발/스모크 가능
+- 부록 B 핀 대비 실제 확정: `@vitejs/plugin-react` 5.x (6.x는 Vite 8 전용), Pretendard는 `@fontsource/pretendard`(정적) — fontsource에 variable 패키지가 없음, lucide-react 0.469 고정(1.x 회피)
+
+**의도적 편차 (사용자 검토 요청)** — 상세 근거는 `src-tauri/README.md` 말미:
+1. 계획서의 타입 명시 `commands/{search,mail,index,sync,system}.rs` 대신 **제네릭 패스스루 `sidecar_request` 1개** — 계약 이중화 방지, 타입 안정성은 TS 래퍼(`frontend/src/lib/api.ts`)에서 확보
+2. `tauri-plugin-log` 대신 최소 std 파일 로깅 (`desktop.log`)
+3. **창 닫기 = 트레이 숨김** (legacy는 닫기=종료) — 트레이 배경 동기화를 위한 상주 정책 변경
+4. 미리보기는 `preview.mail`(평문 본문) 계약 사용 — HTML iframe 렌더 불필요(XSS 공격면 제거)
 
 **문서 끝.**

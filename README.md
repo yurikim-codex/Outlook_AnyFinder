@@ -6,7 +6,8 @@
 > 🚧 **React + Tauri 전환 진행 중** — [MIGRATION_PLAN.md](./MIGRATION_PLAN.md)
 > - 기존 PyQt6 UI(`ui/`, `main.py`)는 `legacy_pyqt/`로 이동했습니다 (전환 완료 시까지 롤백용으로 보존).
 > - 비즈니스 로직(`core/`, `data/`, `utils/`)은 무수정 유지되며, 새 `sidecar/`(JSON Lines IPC 프로세스)에서 그대로 재사용됩니다.
-> - 사이드카 검증: `py -3 -m pytest tests/ -q` (289 passed) / `py -3 sidecar\dev_client.py --doctor` (34/34)
+> - 사이드카 검증: `py -3 -m pytest tests/ -q` (291 passed) / `py -3 sidecar\dev_client.py --doctor` (34/34)
+> - Phase 2(Rust 코어)·Phase 3(React UI) 코드 반영 완료 — Rust는 Windows에서 컴파일 검증 필요(`src-tauri/README.md`)
 
 ---
 
@@ -83,6 +84,26 @@ python legacy_pyqt/main.py
 ```bash
 py -3 -m sidecar --mock              # Mock 모드 사이드카 기동 (stdin/stdout JSON Lines)
 py -3 sidecar\dev_client.py --doctor # 자동 진단 34항목
+```
+
+### 방법 4. React UI 브라우저 개발 (Tauri/Rust 불필요)
+
+```bash
+pip install -r requirements.txt      # 또는 py -3 -m venv .venv 후 설치
+npm install --prefix frontend
+python frontend/dev_bridge.py        # 터미널 1 — 사이드카(mock) + HTTP/SSE 브리지(8765)
+npm run dev --prefix frontend        # 터미널 2 — Vite(5173, /sidecar 프록시)
+# 브라우저에서 http://localhost:5173 — 검색/동기화/설정 전체 동작 (Mock 데이터)
+cd frontend && npm run smoke         # 선택: jsdom 런타임 스모크 (브리지+Vite 실행 중일 때)
+```
+
+### 방법 5. Tauri 전체 개발 (Windows, Rust stable 필요)
+
+```powershell
+powershell -File sidecar\build_sidecar.ps1   # 사이드카 onedir → src-tauri\resources\sidecar\
+npm install                                  # 루트 (Tauri CLI)
+npm run dev                                  # tauri dev (Vite + Rust + 실 사이드카)
+npm run build                                # NSIS 설치본 → src-tauri\target\release\bundle\nsis\
 ```
 
 ---

@@ -12,6 +12,8 @@ def register(dispatcher):
     dispatcher.register("db.backup", backup)
     dispatcher.register("db.integrity", integrity)
     dispatcher.register("db.schema_version", schema_version)
+    dispatcher.register("db.clear_history", clear_history)
+    dispatcher.register("db.reset_all", reset_all)
 
 
 def _meta(conn, key, default=None):
@@ -101,3 +103,56 @@ def schema_version(state, params, ctx):
     else:
         current = int(_meta(state.require_db(), "schema_version") or SCHEMA_VERSION)
     return {"schema_version": current, "sidecar_schema_version": SCHEMA_VERSION}
+
+
+def clear_history(state, params, ctx):
+    """검색 히스토리/세션/연관검색어 초기화 — 북마크는 유지 (legacy 설정 화면 이식)."""
+    from data.database import clear_search_records
+
+    def work(conn):
+        before_hist = conn.execute("SELECT COUNT(*) as n FROM search_history").fetchone()["n"]
+        before_sess = conn.execute("SELECT COUNT(*) as n FROM search_sessions").fetchone()["n"]
+        clear_search_records(conn)
+        return {"cleared_history": before_hist, "cleared_sessions": before_sess}
+
+    return state.in_db(work)
+
+
+def reset_all(state, params, ctx):
+    """전체 데이터 초기화 — 인덱스/해시/히스토리/북마크/메타 전부 삭제 + FTS 재구축.
+
+    legacy 설정 화면 '⚠ 전체 데이터 삭제 및 초기화'의 사이드카 이식.
+    confirm=true 파라미터가 있어야 실행된다 (실수 방지).
+    """
+    if params.get("confirm") is not True:
+        from sidecar.protocol import ErrorCode, SidecarError
+        raise SidecarError(
+            ErrorCode.INVALID_PARAMS,
+            "전체 데이터 초기화는 confirm=true로 명시적 확인이 필요합니다",
+        )
+
+    def work(conn):
+        tables = ["emails", "email_hashes", "search_history", "bookmarks",
+                  "search_sessions", "related_keywords", "sync_meta"]
+        for table in tables:
+            conn.execute(f"DELETE FROM {table}")
+        try:
+            conn.execute("INSERT INTO emails_fts(emails_fts) VALUES('rebuild')")
+        except Exception as e:
+            logger.warning(f"FTS 재구축 실패(무시): {e}")
+        conn.commit()
+        # sync_meta 삭제 때문에 schema_version을 다시 기록한다
+        state._ensure_schema_version(conn)
+        count = conn.execute("SELECT COUNT(*) as n FROM emails").fetchone()["n"]
+        return {"ok": True, "email_count": count}
+
+    result = state.in_db(work)
+
+    # 설정의 first_run_completed도 초기화 (legacy 동작 일치 — 다음 실행 시 최초 인덱싱 플로우)
+    try:
+        settings = state.load_settings()
+        settings["first_run_completed"] = False
+        state.save_settings(settings)
+    except Exception as e:
+        logger.warning(f"설정 초기화 실패(무시): {e}")
+    return result

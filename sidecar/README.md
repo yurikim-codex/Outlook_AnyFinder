@@ -118,7 +118,7 @@ powershell -ExecutionPolicy Bypass -File sidecar\build_sidecar.ps1
 
 ---
 
-## 5. Command 목록 (40개)
+## 5. Command 목록 (42개)
 
 ### system (5)
 
@@ -130,7 +130,7 @@ powershell -ExecutionPolicy Bypass -File sidecar\build_sidecar.ps1
 | `system.commands` | — | `{commands: [...], count}` |
 | `system.debug.print` | `{text?}` | `{ok, printed, stdout_protected}` — stdout 오염 방어 검증용 |
 
-### db (5)
+### db (7)
 
 | cmd | params | result |
 |---|---|---|
@@ -139,6 +139,8 @@ powershell -ExecutionPolicy Bypass -File sidecar\build_sidecar.ps1
 | `db.backup` | `{suffix?}` | `{path, size_mb}` — sqlite3 backup API (WAL 안전) |
 | `db.integrity` | — | `{ok, message}` — PRAGMA integrity_check |
 | `db.schema_version` | `{version?}` | `{schema_version, sidecar_schema_version}` — version 지정 시 기록 |
+| `db.clear_history` | — | `{cleared_history, cleared_sessions}` — 검색 기록만 초기화 (북마크 유지) |
+| `db.reset_all` | `{confirm: true ★}` | `{ok, email_count}` — **전체 데이터 초기화**(인덱스/북마크/히스토리/메타 + FTS 재구축 + first_run_completed=false). confirm 없으면 INVALID_PARAMS |
 
 ### search (5) — ★ COM 불필요, 동기화 중에도 즉시 응답
 
