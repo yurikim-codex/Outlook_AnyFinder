@@ -239,7 +239,7 @@ impl SidecarHandle {
     /// 동기(블로킹) 요청 — 헬스 모니터 등 비-async 스레드용.
     fn request_blocking(&self, cmd: &str, timeout: Duration) -> Result<Value, AppError> {
         let id = self.inner.next_id.fetch_add(1, Ordering::SeqCst);
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
         self.inner.pending.lock().unwrap().insert(id, tx);
 
         let line = protocol::make_request(id, cmd, json!({}));

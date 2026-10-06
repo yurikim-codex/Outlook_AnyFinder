@@ -60,16 +60,16 @@ fn rotate_if_needed(path: &Path) {
 }
 
 /// Rust 코어 로그
-pub fn log(app: &AppHandle, line: &str) {
+pub fn log(_app: &AppHandle, line: &str) {
     append("core", line);
 }
 
 /// 사이드카 stderr 전달 로그
-pub fn log_sidecar(app: &AppHandle, line: &str) {
+pub fn log_sidecar(_app: &AppHandle, line: &str) {
     append("sidecar", line);
 }
 
 /// 프론트엔드 console 전달 로그 (devtools 없이 사용자 문제 파악용)
-pub fn log_frontend(app: &AppHandle, line: &str) {
+pub fn log_frontend(_app: &AppHandle, line: &str) {
     append("frontend", line);
 }
