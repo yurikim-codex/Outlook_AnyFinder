@@ -70,10 +70,20 @@ class SidecarProcess:
 
         args = [sys.executable, "-m", "sidecar", "--mock",
                 "--data-dir", str(self.data_dir), *extra_args]
+        popen_kwargs = {}
+        if sys.platform == "win32":
+            # 프로덕션 Rust(src-tauri/sidecar.rs)와 동일한 생성 플래그.
+            # CREATE_NEW_PROCESS_GROUP이 없으면 test_08의 CTRL_BREAK_EVENT가
+            # pytest/PowerShell이 속한 프로세스 그룹 전체로 브로드캐스트되어
+            # 테스트 러너 자체가 중단된다 (Windows 실측 결함, Track B).
+            # CREATE_NO_WINDOW는 pytest 중 콘솔 창 깜빡임 방지.
+            popen_kwargs["creationflags"] = (
+                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+            )
         self.proc = subprocess.Popen(
             args, cwd=str(REPO_ROOT),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=env,
+            env=env, **popen_kwargs,
         )
         threading.Thread(target=self._read_stdout, daemon=True).start()
         threading.Thread(target=self._read_stderr, daemon=True).start()
