@@ -266,7 +266,7 @@ impl SidecarHandle {
                     }
                     std::thread::sleep(Duration::from_millis(25));
                 }
-                Err(oneshot::error::TryRecvError::Disconnected) => {
+                Err(oneshot::error::TryRecvError::Closed) => {
                     return Err(AppError::SidecarNotRunning)
                 }
             }

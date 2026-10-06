@@ -13,13 +13,12 @@ mod tray;
 use std::sync::Arc;
 
 use tauri::Manager;
-use tauri_plugin_single_instance;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // 단일 인스턴스 — 두 번째 실행 시 기존 창 집중 (반드시 첫 번째 플러그인)
-        .plugin(single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
