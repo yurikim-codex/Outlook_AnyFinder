@@ -72,14 +72,13 @@ class SidecarProcess:
                 "--data-dir", str(self.data_dir), *extra_args]
         popen_kwargs = {}
         if sys.platform == "win32":
-            # 프로덕션 Rust(src-tauri/sidecar.rs)와 동일한 생성 플래그.
-            # CREATE_NEW_PROCESS_GROUP이 없으면 test_08의 CTRL_BREAK_EVENT가
-            # pytest/PowerShell이 속한 프로세스 그룹 전체로 브로드캐스트되어
-            # 테스트 러너 자체가 중단된다 (Windows 실측 결함, Track B).
-            # CREATE_NO_WINDOW는 pytest 중 콘솔 창 깜빡임 방지.
-            popen_kwargs["creationflags"] = (
-                subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-            )
+            # CREATE_NEW_PROCESS_GROUP: 자식을 독립 프로세스 그룹의 리더로 만든다.
+            # 이 플래그 없이 test_08의 GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pid)를
+            # 호출하면 신호가 pytest/PowerShell 콘솔 그룹 전체로 브로드캐스트되어
+            # 테스트 러너 자체가 중단된다 (Windows 실측 결함, Track B 1호).
+            # 주의: CREATE_NO_WINDOW는 붙이면 안 된다 — 콘솔이 없는 자식 프로세스에는
+            # CTRL_BREAK가 전달되지 않는다(GenerateConsoleCtrlEvent는 공유 콘솔 필요).
+            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
         self.proc = subprocess.Popen(
             args, cwd=str(REPO_ROOT),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

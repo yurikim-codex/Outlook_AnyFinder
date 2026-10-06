@@ -3,7 +3,8 @@
   Windows 개발 머신 원샷 검증 — Track B(런북 Step 0~3 보조) 게이트를 한 번에.
 
 .DESCRIPTION
-  순서: 1) pytest(계약 감사 포함) 2) 프런트 tsc+build 3) 브리지+Vite 기동
+  순서: 0) 의존성 부트스트랩(pytest/npm ci) 1) pytest(계약 감사 포함)
+        2) 프런트 tsc+build 3) 브리지+Vite 기동
         4) smoke 5) UI 시나리오 14+1종 6) IPC 런타임 프로브 7) (옵션) cargo test
         8) (옵션) 캡처  → 종료 후 요약표. 실패 항목이 있으면 exit 1.
 
@@ -25,7 +26,10 @@ param(
   [switch]$Capture
 )
 
-$ErrorActionPreference = "Stop"
+# PS 5.1 함정 주의: native 명령(npm/cargo/git)의 stderr는 EAP=Stop + 2>&1 조합에서
+# NativeCommandError로 스크립트 전체를 중단시킨다. 각 단계는 종료코드/HTTP 프로브로
+# 판정하므로 EAP는 Continue로 두고 실패는 Add-Result로 기록한다.
+$ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
@@ -39,6 +43,28 @@ function Add-Result($name, $ok, $note = "") {
 # python 해석기: 프로젝트 venv 우선
 $Py = Join-Path $Root ".venv\Scripts\python.exe"
 if (-not (Test-Path $Py)) { $Py = "python" }
+
+# 0) 의존성 부트스트랩 (fresh clone 대응 — Track B 실측 2호)
+Write-Host "`n== 0/7 의존성 부트스트랩 =="
+& $Py -m pytest --version 1>$null 2>$null
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "pytest 없음 → pip install pytest"
+  & $Py -m pip install --quiet pytest 2>&1 | Select-Object -Last 1
+  & $Py -m pytest --version 1>$null 2>$null
+}
+Add-Result "pytest 준비" ($LASTEXITCODE -eq 0)
+
+Push-Location frontend
+if (-not (Test-Path node_modules)) {
+  # fresh clone: tsc/vite/jsdom 전부 여기 들어 있음. 없으면 npx가 엉뚱한
+  # tsc@2.x 가짜 패키지를 받아 실패한다 (Track B 실측 2호).
+  Write-Host "frontend/node_modules 없음 → npm ci (1~3분)"
+  npm ci 2>&1 | Select-Object -Last 3
+  Add-Result "npm ci" ($LASTEXITCODE -eq 0)
+} else {
+  Add-Result "npm 의존성" $true "node_modules 존재"
+}
+Pop-Location
 
 # 1) pytest (계약 감사 포함)
 Write-Host "`n== 1/7 pytest =="
