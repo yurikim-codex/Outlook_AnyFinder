@@ -96,7 +96,21 @@ python frontend/dev_bridge.py        # 터미널 1 — 사이드카(mock) + HTTP
 npm run dev --prefix frontend        # 터미널 2 — Vite(5173, /sidecar 프록시)
 # 브라우저에서 http://localhost:5173 — 검색/동기화/설정 전체 동작 (Mock 데이터)
 cd frontend && npm run smoke         # 선택: jsdom 런타임 스모크 (브리지+Vite 실행 중일 때)
+cd frontend && npm run scenarios     # 선택: UI 시나리오 자동 검증 13종 (jsdom + 실 브리지, S2~S5·S7~S11·S14~S17)
+cd frontend && npm run capture       # 선택: UI 기본 화면 PNG 캡처 (screenshots/, 브라우저 불필요 파이프라인)
 ```
+
+### 검증 도구 목록 (개발/CI)
+
+| 도구 | 명령 | 범위 |
+|---|---|---|
+| 단위/통합 테스트 | `pytest -q` | 300개 (사이드카·core·IPC T01~T48 포함) |
+| IPC 계약 정적 감사 | `pytest tests/test_ipc_contract_audit.py -q` | 핸들러(AST) vs api.ts 래퍼 파라미터 전수 대조 |
+| IPC 런타임 프로브 | `python tools/contract_probe.py` | 43개 명령 빈 파라미터 응답 적정성 (브리지 실행 중) |
+| UI 시나리오 | `cd frontend && npm run scenarios` | S2~S5·S7~S11·S14~S17 자동 (13종) |
+| 런타임 스모크 | `cd frontend && npm run smoke` | 기동→사이드바→상태바 렌더 |
+| 화면 캡처 | `cd frontend && npm run capture` | screenshots/ui-basic-{dark,light}.png |
+| 롤백 정합 | `python tools/rollback_check.py --full` | legacy↔신버전 공유 데이터 무결성 |
 
 ### 방법 5. Tauri 전체 개발 (Windows, Rust stable 필요)
 
