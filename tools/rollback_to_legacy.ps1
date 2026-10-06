@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   OutLook AnyFinder — React+Tauri 판에서 legacy PyQt6 판으로 즉시 롤백 (Phase 4-6).
 .DESCRIPTION

@@ -1,4 +1,4 @@
-; OutLook AnyFinder NSIS 커스텀 훅 (Phase 5-3)
+﻿; OutLook AnyFinder NSIS 커스텀 훅 (Phase 5-3)
 ; tauri.conf.json bundle.windows.nsis.installerHooks 에서 참조.
 ;
 ; 목적:

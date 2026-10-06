@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     OutLook AnyFinder Python Sidecar 빌드 스크립트 (PyInstaller --onedir)
 

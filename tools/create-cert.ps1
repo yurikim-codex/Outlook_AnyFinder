@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   사내 코드 서명용 자기서명 인증서 생성 (Phase 5-5, DocuFinder create-cert.ps1 패턴).
 .DESCRIPTION

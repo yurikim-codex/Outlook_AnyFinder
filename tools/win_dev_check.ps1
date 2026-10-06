@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Windows 개발 머신 원샷 검증 — Track B(런북 Step 0~3 보조) 게이트를 한 번에.
 
@@ -130,7 +130,7 @@ finally {
   # 정리
   foreach ($p in @($bridgeProc, $viteProc)) {
     try {
-      if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Tree -Force -ErrorAction SilentlyContinue }
+      if ($p -and -not $p.HasExited) { taskkill /PID $p.Id /T /F 2>$null | Out-Null }
     } catch { }
   }
 }

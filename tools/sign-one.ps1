@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   tauri build signCommand 래퍼 — 빌드 중 각 바이너리/설치본을 1개씩 서명 (Phase 5-5).
 .DESCRIPTION

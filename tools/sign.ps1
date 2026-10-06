@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   빌드 산출물 코드 서명 (Phase 5-5). signtool(Windows SDK) 필요.
 .DESCRIPTION
