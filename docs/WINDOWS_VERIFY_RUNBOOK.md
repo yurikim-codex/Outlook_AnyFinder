@@ -50,6 +50,8 @@ npm run dev
 - [ ] 3-5 창 닫기 → 트레이 숨김 / 트레이 "지금 동기화" → 동기화 시작 (S18)
 - [ ] 3-6 두 번째 `npm run dev` 실행 → 기존 창 포커스만 (단일 인스턴스, S19)
 - [ ] 3-7 트레이 "종료" → 사이드카 포함 프로세스 0건 (좀비 0)
+- [ ] 3-8 IPC 런타임 프로브: 개발 브리지 띄운 상태(mock)에서 `python tools/contract_probe.py` → `PROBE_OK`
+      (43개 명령 전수 호출, INTERNAL/PARSE_ERROR/크래시 0건 확인 — Windows 사이드카 빌드 동일 검증)
 
 ## 4. 실 Outlook 스파이크 B + 실데이터 패리티 — 10분
 
