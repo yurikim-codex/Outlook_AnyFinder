@@ -21,6 +21,11 @@ import sys
 import urllib.error
 import urllib.request
 
+# Windows 콘솔(cp949)에서 "—" 등 출력 시 UnicodeEncodeError로 죽는 문제 방지
+# (Track B 실측). PYTHONUTF8과 무관하게 스크립트 스스로 UTF-8을 강제한다.
+sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 from tests.test_ipc_contract_audit import load_sidecar_contract  # noqa: E402
 

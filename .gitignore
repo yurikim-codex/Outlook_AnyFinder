@@ -80,7 +80,8 @@ frontend/dist/
 # Tauri build outputs
 src-tauri/target/
 src-tauri/gen/
-src-tauri/resources/sidecar/
+src-tauri/resources/sidecar/*
+!src-tauri/resources/sidecar/PLACEHOLDER.md
 
 # Tauri updater signing keys (비밀키 — 커밋 금지)
 tools/updater-keys/

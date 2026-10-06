@@ -68,18 +68,41 @@ const bundle =
   `./dist/assets/${fs
     .readdirSync("./dist/assets")
     .find((f) => f.startsWith("index-") && f.endsWith(".js"))}`;
+
+// 준비: 앱 기동 "전에" 인덱스 구축 — fresh 머신에서는 mock DB가 비어 있어
+// 사이드바 폴더(받은편지함)가 렌더되지 않는다 (Track B 실측 3호).
+// scenarios.mjs와 동일한 준비 시퀀스.
+const prepRes = await nodeFetch(`${BASE}/sidecar/invoke`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ cmd: "index.build", params: {} }),
+});
+const prep = await prepRes.json();
+if (!prep.ok) {
+  console.log(`FAIL — 준비 index.build: ${JSON.stringify(prep.error)}`);
+  console.log("SMOKE_FAIL(1)");
+  process.exit(1);
+}
+
 await import(bundle);
 
-// 렌더 + 초기 데이터 로드 대기
-await new Promise((r) => setTimeout(r, 3500));
-
-const html = dom.window.document.body.innerHTML;
-const checks = [
-  ["앱 셸 타이틀", html.includes("OutLook AnyFinder")],
-  ["검색 입력창", html.includes("메일 검색")],
-  ["사이드바 폴더(mock)", html.includes("받은편지함")],
-  ["상태바", html.includes("사이드카")],
-];
+// 렌더 + 초기 데이터 로드 대기 — mock 사이드카 cold start(Windows에서 수 초)로
+// 폴더 목록 도착이 지연될 수 있어 고정 대기가 아니라 폴링한다 (Track B 실측 3호).
+const collectChecks = () => {
+  const html = dom.window.document.body.innerHTML;
+  return [
+    ["앱 셸 타이틀", html.includes("OutLook AnyFinder")],
+    ["검색 입력창", html.includes("메일 검색")],
+    ["사이드바 폴더(mock)", html.includes("받은편지함")],
+    ["상태바", html.includes("사이드카")],
+  ];
+};
+const deadline = Date.now() + 20000;
+let checks = collectChecks();
+while (Date.now() < deadline && !checks.every(([, ok]) => ok) && errors.length === 0) {
+  await new Promise((r) => setTimeout(r, 500));
+  checks = collectChecks();
+}
 
 let fail = 0;
 for (const [name, ok] of checks) {

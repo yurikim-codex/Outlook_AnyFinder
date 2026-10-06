@@ -33,6 +33,11 @@ $ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
+# 출력 깨짐(모지바케) 방지: native(node/python) UTF-8 출력을 콘솔이 UTF-8로 해석.
+# PYTHONUTF8은 Python 자식의 stdout을 UTF-8로 강제 (cp949 UnicodeEncodeError 방지).
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+$env:PYTHONUTF8 = "1"
+
 $results = @()
 function Add-Result($name, $ok, $note = "") {
   $script:results += [pscustomobject]@{ Name = $name; OK = $ok; Note = $note }
@@ -106,7 +111,7 @@ try {
   Write-Host "`n== 4/7 smoke =="
   if ($bridgeUp -and $viteUp) {
     Push-Location frontend
-    node smoke.mjs 2>&1 | Select-Object -Last 2
+    node smoke.mjs 2>&1 | Select-Object -Last 6
     Add-Result "smoke" ($LASTEXITCODE -eq 0)
     Pop-Location
   } else { Add-Result "smoke" $false "서버 미기동" }
