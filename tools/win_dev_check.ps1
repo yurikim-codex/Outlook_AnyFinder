@@ -51,6 +51,12 @@ if (-not (Test-Path $Py)) { $Py = "python" }
 
 # 0) 의존성 부트스트랩 (fresh clone 대응 — Track B 실측 2호)
 Write-Host "`n== 0/7 의존성 부트스트랩 =="
+& $Py -m pip --version 1>$null 2>$null
+if ($LASTEXITCODE -ne 0) {
+  # python.org 설치본에서 pip가 없는 경우 (Track B 실측 4호)
+  Write-Host "pip 없음 → ensurepip"
+  & $Py -m ensurepip --upgrade 2>&1 | Select-Object -Last 1
+}
 & $Py -m pytest --version 1>$null 2>$null
 if ($LASTEXITCODE -ne 0) {
   Write-Host "pytest 없음 → pip install pytest"
@@ -58,6 +64,16 @@ if ($LASTEXITCODE -ne 0) {
   & $Py -m pytest --version 1>$null 2>$null
 }
 Add-Result "pytest 준비" ($LASTEXITCODE -eq 0)
+
+if (-not (Test-Path (Join-Path $Root "node_modules"))) {
+  # 루트 package.json = Tauri CLI. 없으면 npm run dev가
+  # "'tauri'은(는) 내부 또는 외부 명령" 으로 실패 (Track B 실측 4호)
+  Write-Host "루트 node_modules 없음 → npm install (Tauri CLI)"
+  npm install --no-audit --no-fund 2>&1 | Select-Object -Last 3
+  Add-Result "npm install(루트)" ($LASTEXITCODE -eq 0)
+} else {
+  Add-Result "npm 의존성(루트)" $true "node_modules 존재"
+}
 
 Push-Location frontend
 if (-not (Test-Path node_modules)) {

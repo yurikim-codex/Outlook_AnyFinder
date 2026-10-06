@@ -60,6 +60,7 @@ npm run dev
 준비 (실모드는 pywin32(COM) 필수 — Python 3.14용 wheel 존재 확인됨, PyInstaller 6.22도 3.14 지원):
 
 ```powershell
+python -m pip --version          # 실패 시: python -m ensurepip --upgrade
 python -m pip install pywin32 pyinstaller
 python -c "import win32com.client; print('pywin32 OK')"
 ```
