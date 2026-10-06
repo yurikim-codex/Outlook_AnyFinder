@@ -57,8 +57,21 @@ npm run dev
 
 ## 4. 실 Outlook 스파이크 B + 실데이터 패리티 — 10분
 
+준비 (실모드는 pywin32(COM) 필수 — Python 3.14용 wheel 존재 확인됨, PyInstaller 6.22도 3.14 지원):
+
 ```powershell
-Remove-Item Env:ANYFINDER_MOCK
+python -m pip install pywin32 pyinstaller
+python -c "import win32com.client; print('pywin32 OK')"
+```
+
+사이드카 기동 경로 확인 — `npm run dev`는 아래 순서로 사이드카를 찾는다 (src-tauri/src/sidecar.rs):
+1. `ANYFINDER_SIDECAR_CMD` 환경변수 2. 번들 리소스 exe (Step 2 수행 시)
+3. `dist\OutlookAnyFinderSidecar\...exe` 4. 폴백 `py -3 -m sidecar` (저장소 루트)
+→ Step 2를 수행했으면 빌드된 exe가 쓰이고, 안 했으면 폴백으로 dev Python이 사용된다
+(어느 쪽이든 pywin32 필요: exe는 번들, 폴백은 pip 설치분).
+
+```powershell
+Remove-Item Env:ANYFINDER_MOCK -ErrorAction SilentlyContinue
 npm run dev
 ```
 
