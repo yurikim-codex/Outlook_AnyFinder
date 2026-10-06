@@ -39,7 +39,9 @@ export const searchRelated = (t: Transport, keyword: string, limit = 8) =>
 export const autocompleteEmails = (t: Transport, prefix: string, limit = 8) =>
   t.request<{ emails: string[] }>("autocomplete.emails", { prefix, limit });
 export const autocompleteSuggest = (t: Transport, prefix: string, limit = 8) =>
-  t.request<{ suggestions: string[] }>("autocomplete.suggest", { prefix, limit });
+  t.request<{
+    suggestions: { keyword: string; search_count: number; last_searched_at: string }[];
+  }>("autocomplete.suggest", { prefix, limit });
 
 // ── db ──
 export const dbStats = (t: Transport) => t.request<DbStats>("db.stats");
@@ -72,15 +74,19 @@ export const indexBuild = (t: Transport, params: Record<string, unknown> = {}) =
 export const indexRebuildFts = (t: Transport) => t.request<{ ok: boolean }>("index.rebuild_fts");
 
 // ── bookmark ──
-export const bookmarkList = (t: Transport) => t.request<{ items: Bookmark[] }>("bookmark.list");
-export const bookmarkAdd = (t: Transport, keyword: string) =>
-  t.request<{ id: number }>("bookmark.add", { keyword });
+export const bookmarkList = (t: Transport) =>
+  t.request<{ items: Bookmark[]; count: number }>("bookmark.list");
+export const bookmarkAdd = (t: Transport, query: string, name?: string) =>
+  t.request<{ id: number; name: string; query: string }>("bookmark.add", {
+    query,
+    ...(name ? { name } : {}),
+  });
 export const bookmarkRemove = (t: Transport, id: number) =>
-  t.request<{ ok: boolean }>("bookmark.remove", { id });
-export const bookmarkToggle = (t: Transport, keyword: string) =>
-  t.request<{ added: boolean; id?: number }>("bookmark.toggle", { keyword });
-export const bookmarkRename = (t: Transport, id: number, keyword: string) =>
-  t.request<{ ok: boolean }>("bookmark.rename", { id, keyword });
+  t.request<{ removed: boolean; id: number }>("bookmark.remove", { id });
+export const bookmarkToggle = (t: Transport, query: string) =>
+  t.request<{ bookmarked: boolean; query: string }>("bookmark.toggle", { query });
+export const bookmarkRename = (t: Transport, id: number, name: string) =>
+  t.request<{ ok: boolean }>("bookmark.rename", { id, name });
 
 // ── settings ──
 export const settingsGet = (t: Transport) =>

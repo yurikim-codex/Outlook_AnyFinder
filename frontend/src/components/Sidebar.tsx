@@ -73,15 +73,15 @@ export function Sidebar() {
             <li key={b.id} className="group flex items-center">
               <button
                 className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-[var(--bg-hover)]"
-                onClick={() => void doSearch({ query: String(b.keyword) })}
+                onClick={() => void doSearch({ query: String(b.query) })}
                 title="북마크 검색 실행"
               >
                 <Star size={13} className="shrink-0 fill-[var(--warn)] text-[var(--warn)]" />
-                <span className="truncate">{String(b.keyword)}</span>
+                <span className="truncate">{String(b.name || b.query)}</span>
               </button>
               <button
                 className="btn btn-ghost invisible p-1 group-hover:visible"
-                onClick={() => void toggleBookmark(String(b.keyword))}
+                onClick={() => void toggleBookmark(String(b.query))}
                 title="북마크 제거"
               >
                 <BookmarkX size={12} />

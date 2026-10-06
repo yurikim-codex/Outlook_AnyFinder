@@ -37,6 +37,11 @@ export function Header() {
     useApp();
 
   const [query, setQuery] = useState(search.params.query);
+
+  // 외부 검색(사이드바 북마크/연관 검색어 칩 등) 시 입력창을 실행된 검색어로 동기화
+  useEffect(() => {
+    setQuery((prev) => (prev === search.params.query ? prev : search.params.query));
+  }, [search.params.query]);
   // 설정(search.contains_search)과 양방향 동기 — bootstrap이 config 기본값을 주입한다
   const exactOnly = search.params.contains_search === false;
   const setExactOnly = (v: boolean) => void doSearch({ contains_search: !v });
@@ -53,7 +58,7 @@ export function Header() {
     const t = window.setTimeout(() => {
       api
         .autocompleteSuggest(getTransport(), query.trim(), 8)
-        .then((r) => setSuggestions(r.suggestions ?? []))
+        .then((r) => setSuggestions((r.suggestions ?? []).map((s) => s.keyword)))
         .catch(() => setSuggestions([]));
     }, 200);
     return () => window.clearTimeout(t);
@@ -150,7 +155,7 @@ export function Header() {
               title="현재 검색어 북마크"
               onClick={() => void toggleBookmark(search.params.query.trim())}
             >
-              <Star size={14} className={clsx(bookmarks.some((b) => b.keyword === search.params.query.trim()) && "fill-[var(--warn)] text-[var(--warn)]")} />
+              <Star size={14} className={clsx(bookmarks.some((b) => b.query === search.params.query.trim()) && "fill-[var(--warn)] text-[var(--warn)]")} />
             </button>
           )}
           <button

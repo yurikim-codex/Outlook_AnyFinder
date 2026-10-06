@@ -217,7 +217,11 @@ export interface JobStatus {
 
 export interface Bookmark {
   id: number;
-  keyword: string;
+  name: string;
+  query: string;
+  filters?: Record<string, unknown> | null;
+  position?: number;
+  created_at?: string;
   [key: string]: unknown;
 }
 

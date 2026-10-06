@@ -83,7 +83,7 @@ interface AppContextValue {
   cancelSync: () => Promise<void>;
   refreshMeta: () => Promise<void>;
   refreshBookmarks: () => Promise<void>;
-  toggleBookmark: (keyword: string) => Promise<void>;
+  toggleBookmark: (query: string) => Promise<void>;
   setTheme: (theme: ThemeId) => Promise<void>;
   updateSettings: (patch: Record<string, unknown>) => Promise<void>;
   restartSidecar: () => Promise<void>;
@@ -228,6 +228,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...patch,
         page: opts?.resetPage === false ? (patch.page ?? paramsRef.current.page) : 1,
       };
+      // Parity: legacy는 검색 시 기록을 적립했다 — 자동완성/연관검색어의 원료
+      next.record_history = Boolean(next.query?.trim());
       paramsRef.current = next;
       setSearch((prev) => ({ params: next, response: prev.response, loading: true, error: null }));
       try {
@@ -341,11 +343,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [transport, toast]);
 
   const toggleBookmark = useCallback(
-    async (keyword: string) => {
+    async (query: string) => {
       try {
-        const r = await api.bookmarkToggle(transport, keyword);
+        const r = await api.bookmarkToggle(transport, query);
         await refreshBookmarks();
-        toast(r.added ? `"${keyword}" 북마크 추가` : `"${keyword}" 북마크 제거`, "info");
+        toast(r.bookmarked ? `"${query}" 북마크 추가` : `"${query}" 북마크 제거`, "info");
       } catch (e) {
         toast(`북마크 실패: ${errText(e)}`, "error");
       }
