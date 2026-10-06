@@ -111,6 +111,7 @@ cd frontend && npm run capture       # 선택: UI 기본 화면 PNG 캡처 (scre
 | 런타임 스모크 | `cd frontend && npm run smoke` | 기동→사이드바→상태바 렌더 |
 | 화면 캡처 | `cd frontend && npm run capture` | screenshots/ui-basic-{dark,light}.png |
 | 롤백 정합 | `python tools/rollback_check.py --full` | legacy↔신버전 공유 데이터 무결성 |
+| Windows 원샷 | `powershell -File tools\win_dev_check.ps1` | 위 게이트 일괄(브리지/Vite 자동 기동·정리) |
 
 ### 방법 5. Tauri 전체 개발 (Windows, Rust stable 필요)
 

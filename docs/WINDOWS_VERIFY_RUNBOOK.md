@@ -50,6 +50,8 @@ npm run dev
 - [ ] 3-5 창 닫기 → 트레이 숨김 / 트레이 "지금 동기화" → 동기화 시작 (S18)
 - [ ] 3-6 두 번째 `npm run dev` 실행 → 기존 창 포커스만 (단일 인스턴스, S19)
 - [ ] 3-7 트레이 "종료" → 사이드카 포함 프로세스 0건 (좀비 0)
+- [ ] 3-0(선택) 원샷 자동 검증: `powershell -ExecutionPolicy Bypass -File tools\win_dev_check.ps1`
+      — pytest·tsc·build·브리지/Vite·smoke·시나리오·프로브·cargo test를 순차 실행 후 요약 (실패 시 exit 1)
 - [ ] 3-8 IPC 런타임 프로브: 개발 브리지 띄운 상태(mock)에서 `python tools/contract_probe.py` → `PROBE_OK`
       (43개 명령 전수 호출, INTERNAL/PARSE_ERROR/크래시 0건 확인 — Windows 사이드카 빌드 동일 검증)
 
