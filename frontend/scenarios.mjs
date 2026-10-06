@@ -1,7 +1,7 @@
 /**
  * A2 — UI 시나리오 자동 검증 하니스 (jsdom + 실 브리지).
  *
- * 수동 시나리오 S2~S5,S7~S11,S14~S17을 브라우저 없이 "실제 DOM 조작"으로 검증한다.
+ * 수동 시나리오 S2~S11,S14~S17을 브라우저 없이 "실제 DOM 조작"으로 검증한다.
  * 선행조건: dev_bridge.py + vite dev 실행 중 (npm run bridge / npm run dev --prefix frontend)
  * 사용: cd frontend && npm run scenarios
  *
@@ -167,6 +167,28 @@ await scenario("S3", "다중 단어 AND (견적+검토)", async () => {
   const n = resultCount();
   if (!(n >= 1)) throw new Error(`1건 이상 기대, 실제 ${n}`);
   return `${n}건`;
+});
+
+await scenario("S6", "폴더 OR 필터 (받은+보낸 = 합집합)", async () => {
+  const chip = (name) => $$("header button").find((b) => b.textContent.includes(name));
+  setInput(searchInput(), "");
+  click(searchBtn());
+  await waitSearch("S6 전체");
+  const total = resultCount();
+  click(chip("받은편지함"));
+  await waitSearch("S6 받은편지함");
+  const inbox = resultCount();
+  click(chip("보낸편지함"));
+  await waitSearch("S6 OR");
+  const both = resultCount();
+  if (!(0 < inbox && inbox < total)) throw new Error(`받은편지함 ${inbox}건 비정상`);
+  if (both !== total) throw new Error(`OR ${both} ≠ 전체 ${total} (합집합 실패)`);
+  click(chip("받은편지함"));
+  await waitSearch("S6 받은 해제");
+  click(chip("보낸편지함"));
+  await waitSearch("S6 복원");
+  if (resultCount() !== total) throw new Error("필터 복원 실패");
+  return `받은 ${inbox} + 보낸 ${both - inbox} = OR ${both} (legacy AND 버그 없음)`;
 });
 
 await scenario("S4", "메일 주소 검색 (발신자)", async () => {

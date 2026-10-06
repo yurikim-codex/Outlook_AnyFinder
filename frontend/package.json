@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "smoke": "node smoke.mjs",
-    "scenarios": "node scenarios.mjs",
+    "scenarios": "node scenarios.mjs && node scenario-firstrun.mjs",
     "capture": "node capture.mjs"
   },
   "dependencies": {
