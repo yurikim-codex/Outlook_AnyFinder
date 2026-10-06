@@ -1,7 +1,7 @@
 /**
  * A2 — UI 시나리오 자동 검증 하니스 (jsdom + 실 브리지).
  *
- * 수동 시나리오 S2,S3,S5,S7~S11,S14~S16을 브라우저 없이 "실제 DOM 조작"으로 검증한다.
+ * 수동 시나리오 S2~S5,S7~S11,S14~S16을 브라우저 없이 "실제 DOM 조작"으로 검증한다.
  * 선행조건: dev_bridge.py + vite dev 실행 중 (npm run bridge / npm run dev --prefix frontend)
  * 사용: cd frontend && npm run scenarios
  *
@@ -167,6 +167,19 @@ await scenario("S3", "다중 단어 AND (견적+검토)", async () => {
   const n = resultCount();
   if (!(n >= 1)) throw new Error(`1건 이상 기대, 실제 ${n}`);
   return `${n}건`;
+});
+
+await scenario("S4", "메일 주소 검색 (발신자)", async () => {
+  setInput(searchInput(), "kim.cs@company");
+  click(searchBtn());
+  await waitSearch("S4 주소 검색");
+  const withAddr = resultCount();
+  if (!withAddr) throw new Error("발신자 주소 검색 0건");
+  setInput(searchInput(), "nobody@nowhere.dev");
+  click(searchBtn());
+  await waitSearch("S4 무관 주소");
+  if (resultCount() !== 0) throw new Error(`무관 주소 ${resultCount()}건 (0 기대)`);
+  return `kim.cs@company → ${withAddr}건 / 무관 주소 0건`;
 });
 
 await scenario("S5", "자동완성 드롭다운 + 기록", async () => {

@@ -36,8 +36,8 @@ export const searchRelated = (t: Transport, keyword: string, limit = 8) =>
   t.request<{ keywords: string[] }>("search.related", { keyword, limit });
 
 // ── autocomplete ──
-export const autocompleteEmails = (t: Transport, prefix: string, limit = 8) =>
-  t.request<{ emails: string[] }>("autocomplete.emails", { prefix, limit });
+export const autocompleteEmails = (t: Transport) =>
+  t.request<{ emails: string[]; count: number }>("autocomplete.emails");
 export const autocompleteSuggest = (t: Transport, prefix: string, limit = 8) =>
   t.request<{
     suggestions: { keyword: string; search_count: number; last_searched_at: string }[];
