@@ -8,6 +8,7 @@ Tauri 없이 브라우저에서만 UI를 개발할 때, Vite 프록시(/sidecar/
   GET  /events   SSE — 사이드카 이벤트(ready/sync.progress/index.progress/...) 스트림
   GET  /status   {"ready":..., "running":..., "restarts":...}
   POST /restart  사이드카 재시작
+  POST /fault    {"count": N} — 다음 N개 invoke를 503 장애 주입 (0=해제, S17용)
   GET  /health   {"alive": true}
 
 사용법:
@@ -46,6 +47,7 @@ class Bridge:
         self.subscribers: list[queue.Queue] = []
         self.ready = False
         self.restarts = 0
+        self.fail_next = 0  # 장애 주입: 다음 N개 invoke를 503으로 (S17 테스트용)
         self.exited = False
 
     # ── 프로세스 ──
@@ -244,7 +246,21 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, json.dumps({"error": "not found"}).encode())
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path == "/fault":
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length)
+            try:
+                n = int((json.loads(raw.decode("utf-8")) or {}).get("count", 0))
+            except ValueError:
+                n = 0
+            BRIDGE.fail_next = max(0, n)
+            self._send(200, json.dumps({"ok": True, "fail_next": BRIDGE.fail_next}).encode())
+            return
         if self.path == "/invoke":
+            if BRIDGE.fail_next > 0:
+                BRIDGE.fail_next -= 1
+                self._send(503, json.dumps({"id": None, "ok": False, "error": {"code": "INTERNAL", "message": "주입된 장애: 사이드카 응답 불가(모의)", "retryable": True}}).encode())
+                return
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length)
             try:

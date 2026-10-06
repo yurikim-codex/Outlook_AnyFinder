@@ -1,7 +1,7 @@
 /**
  * A2 — UI 시나리오 자동 검증 하니스 (jsdom + 실 브리지).
  *
- * 수동 시나리오 S2~S5,S7~S11,S14~S16을 브라우저 없이 "실제 DOM 조작"으로 검증한다.
+ * 수동 시나리오 S2~S5,S7~S11,S14~S17을 브라우저 없이 "실제 DOM 조작"으로 검증한다.
  * 선행조건: dev_bridge.py + vite dev 실행 중 (npm run bridge / npm run dev --prefix frontend)
  * 사용: cd frontend && npm run scenarios
  *
@@ -332,6 +332,24 @@ await scenario("S16", "폴더 동기화: 계획 → 승인 → 완료", async ()
   await waitFor(() => dialog().textContent.includes("동기화 완료"), "S16 완료 뷰", 30000);
   click(dialogButton("닫기"));
   return "plan→execute→done 흐름";
+});
+
+await scenario("S17", "장애 회복: 사이드카 응답 불가 → 오류 표시 → 복구", async () => {
+  const direct = (p, init) => nodeFetch(`http://127.0.0.1:8765${p}`, init);
+  const errShown = () => Boolean($('footer span[class*="--danger"]'));
+  // 장애 주입(브리지 /fault) — 실 프로세스 종료는 Rust 셸 영역(Windows S17)
+  const f = await (await direct("/fault", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count: 50 }) })).json();
+  if (!f.ok) throw new Error("fault 주입 실패");
+  setInput(searchInput(), "견적서");
+  click(searchBtn());
+  await waitFor(errShown, "S17 오류 표시", 8000);
+  // 해제 → 자동 복구
+  await direct("/fault", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count: 0 }) });
+  click(searchBtn());
+  await waitSearch("S17 복구 검색");
+  if (!resultCount()) throw new Error("복구 후 검색 0건");
+  if (errShown()) throw new Error("복구 후에도 오류 표시 잔존");
+  return "오류 표시 → 장애 해제 → 검색 복구";
 });
 
 // ── 집계 ──
