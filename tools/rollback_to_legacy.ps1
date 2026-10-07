@@ -7,6 +7,9 @@
 .NOTES
   - 신버전 설치본(NSIS) 제거는 별개: 설정>앱 또는 uninstaller 사용 (데이터는 유지됨).
   - -SkipBuild : 기존 dist\OutLookAnyFinder 빌드를 재사용.
+  - 주의: build_exe.py는 dist\ 전체를 지우고 시작한다 — 사이드카 dist 사본
+    (dist\OutlookAnyFinderSidecar)도 삭제됨. src-tauri\resources\sidecar와
+    설치본에는 영향 없으며, 필요 시 sidecar\build_sidecar.ps1로 재생성.
 #>
 param(
   [switch]$SkipBuild
@@ -21,14 +24,27 @@ Get-Process | Where-Object { $_.MainWindowTitle -like "*OutLook AnyFinder*" } | 
 Start-Sleep -Seconds 1
 
 Write-Host "==> 2/5 롤백 전 데이터 무결성 검사" -ForegroundColor Cyan
+# (PS 5.1 함정: EAP=Stop에서 python stderr 출력이 NativeCommandError로 스크립트
+#  즉사 — Track B 실측 5호와 동일 패턴. python 호출 구간만 EAP를 내린다.)
+$eapBak = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 python (Join-Path $Root "tools\rollback_check.py")
-if ($LASTEXITCODE -ne 0) { throw "데이터 무결성 검사 실패 — 롤백을 중단합니다" }
+$rcExit = $LASTEXITCODE
+$ErrorActionPreference = $eapBak
+if ($rcExit -ne 0) { throw "데이터 무결성 검사 실패 — 롤백을 중단합니다" }
 
 if (-not $SkipBuild) {
   Write-Host "==> 3/5 legacy PyQt6 빌드 (build_exe.py)" -ForegroundColor Cyan
   Push-Location $Root
-  try { python build_exe.py } finally { Pop-Location }
-  if ($LASTEXITCODE -ne 0) { throw "legacy 빌드 실패" }
+  try {
+    $ErrorActionPreference = "Continue"
+    python build_exe.py
+    $buildExit = $LASTEXITCODE
+  } finally {
+    Pop-Location
+    $ErrorActionPreference = $eapBak
+  }
+  if ($buildExit -ne 0) { throw "legacy 빌드 실패" }
 } else {
   Write-Host "==> 3/5 기존 빌드 재사용 (-SkipBuild)" -ForegroundColor Cyan
 }
@@ -40,7 +56,10 @@ Write-Host "==> 4/5 legacy 기동" -ForegroundColor Cyan
 Start-Process $legacyExe
 
 Write-Host "==> 5/5 롤백 후 데이터 무결성 재확인" -ForegroundColor Cyan
+$ErrorActionPreference = "Continue"
 python (Join-Path $Root "tools\rollback_check.py")
-if ($LASTEXITCODE -ne 0) { throw "롤백 후 데이터 검사 실패 — 수동 확인 필요" }
+$rcExit2 = $LASTEXITCODE
+$ErrorActionPreference = $eapBak
+if ($rcExit2 -ne 0) { throw "롤백 후 데이터 검사 실패 — 수동 확인 필요" }
 
 Write-Host "`n롤백 완료 — legacy PyQt6 판이 실행 중입니다. 데이터는 그대로입니다." -ForegroundColor Green
