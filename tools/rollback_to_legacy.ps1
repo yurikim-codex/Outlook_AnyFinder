@@ -20,6 +20,9 @@ $Root = Split-Path -Parent $Script:MyInvocation.MyCommand.Path | Split-Path -Par
 
 Write-Host "==> 1/5 신버전 프로세스 중지" -ForegroundColor Cyan
 Get-Process -Name "OutlookAnyFinderSidecar" -ErrorAction SilentlyContinue | Stop-Process -Force
+# legacy PyQt6 프로세스도 종료 — dist\OutLookAnyFinder 재빌드 시 DLL 잠금
+# (PermissionError WinError 5) 방지 (Track B 실측 7호)
+Get-Process -Name "OutLookAnyFinder" -ErrorAction SilentlyContinue | Stop-Process -Force
 Get-Process | Where-Object { $_.MainWindowTitle -like "*OutLook AnyFinder*" } | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 

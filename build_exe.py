@@ -76,7 +76,23 @@ def clean():
     for name in ["build", "dist"]:
         p = ROOT / name
         if p.exists():
-            shutil.rmtree(p)
+            try:
+                shutil.rmtree(p)
+            except PermissionError:
+                # 실행 중인 OutLookAnyFinder.exe가 DLL을 잠그고 있는 경우 —
+                # 프로세스 종료 후 재시도 (Track B 실측 7호: WinError 5)
+                if sys.platform == "win32":
+                    print("⚠️ dist/build 잠김 — OutLookAnyFinder.exe 종료 후 재시도...")
+                    subprocess.run(
+                        ["taskkill", "/F", "/IM", "OutLookAnyFinder.exe"],
+                        capture_output=True,
+                    )
+                    import time
+
+                    time.sleep(1.5)
+                    shutil.rmtree(p)
+                else:
+                    raise
 
 
 def build_onedir():
