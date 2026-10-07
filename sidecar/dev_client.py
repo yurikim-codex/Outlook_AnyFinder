@@ -542,6 +542,26 @@ def run_repl(client):
     client.shutdown()
 
 
+def _report_crash(client):
+    """사이드카 급사 시 진단 정보 — exit code + 프로세스 생존 여부 + stderr 꼬리.
+
+    설치본에서 관측된 'stdout EOF → 13초 후 exit -1' 패턴(Track B 실측 8호)의
+    정체를 가른다: wait(20초)가 제때 끝나면 진짜 종료, 타임아웃하면
+    'stdout만 닫히고 프로세스는 생존' 상태.
+    """
+    proc = client.proc
+    try:
+        code = proc.wait(timeout=20)
+        print(f"⚠ 사이드카 프로세스 종료 — exit code: {code} (0x{code & 0xFFFFFFFF:08x})", file=sys.stderr)
+    except Exception:
+        print("⚠ 사이드카 프로세스가 20초 내 종료하지 않음 — stdout만 닫히고 생존 상태!", file=sys.stderr)
+    tail = getattr(client, "_err", [])[-30:]
+    if tail:
+        print("---- 사이드카 stderr (마지막 30줄) ----", file=sys.stderr)
+        for ln in tail:
+            print(ln.decode("utf-8", errors="replace").rstrip(), file=sys.stderr)
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
 
@@ -602,6 +622,7 @@ def main(argv=None):
         return 0 if resp.get("ok") else 1
     except Exception as e:
         print(f"⚠ {type(e).__name__}: {e}", file=sys.stderr)
+        _report_crash(client)
         return 1
     finally:
         client.kill()

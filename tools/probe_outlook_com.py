@@ -1,4 +1,4 @@
-"""실 Outlook COM 프로브 — 사이드카 급사 지점 단계별 특정 (Track B 실측 8호).
+r"""실 Outlook COM 프로브 — 사이드카 급사 지점 단계별 특정 (Track B 실측 8호).
 
 배경: 설치본 사이드카가 실 Outlook 동기화 중 exit code -1로 급사하는데
   - Windows 이벤트 로그에 크래시 기록 없음 (WER 미생성 = 네이티브 ExitProcess 계열)
