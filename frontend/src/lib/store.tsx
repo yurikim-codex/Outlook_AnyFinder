@@ -394,6 +394,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const payload = (data ?? {}) as ProgressData;
       switch (event) {
         case "ready":
+          // 셸 구버전(ready status 미브로드캐스트) 대비: ready 이벤트 자체로도 해제
+          setStatus((prev) => ({ ...prev, ready: true, running: true }));
           if (!bootstrapped.current) {
             bootstrapped.current = true;
             void bootstrap();

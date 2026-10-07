@@ -122,6 +122,15 @@ _setup_logging(_DATA_DIR / "logs", _OPTS["log_level"])
 logger = logging.getLogger("sidecar.main")
 logger.info(f"사이드카 시작 — utf8_io={_UTF8_REPORT}, stdout_protect={_OPTS['protect_stdout']}")
 
+# 네이티브 크래시 수사 장치 (Track B 실측 8~10호): 접근 위반 등 네이티브 급사 시
+# 스택 트레이스를 stderr(=desktop.log)로 덤프한다. 동결 빌드에서도 동작.
+try:
+    import faulthandler
+
+    faulthandler.enable(file=sys.stderr, all_threads=True)
+except Exception:
+    pass
+
 # ═══ STEP 3: 비즈니스 로직 import ═══
 # (이 시점 이후의 import 경고/출력은 모두 stderr로만 간다)
 

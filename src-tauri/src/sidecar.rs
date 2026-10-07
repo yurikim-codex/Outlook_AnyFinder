@@ -342,7 +342,7 @@ impl SidecarHandle {
         })
     }
 
-    fn emit_status(&self, state: &str, detail: Option<&str>) {
+    pub fn emit_status(&self, state: &str, detail: Option<&str>) {
         let mut payload = self.status_payload();
         if let Some(obj) = payload.as_object_mut() {
             obj.insert("state".into(), json!(state));
@@ -456,6 +456,11 @@ fn reader_loop(inner: Arc<Inner>, stdout: impl std::io::Read + Send + 'static) {
                     inner.ready.store(true, Ordering::SeqCst);
                     inner.health_fails.store(0, Ordering::SeqCst);
                     logging::log(&app, "사이드카 ready — 검색 엔진 활성화");
+                    // ★ 프런트엔드는 sidecar://status 이벤트로만 ready를 알게 된다 —
+                    //   ready 시점에 status를 브로드캐스트하지 않으면 UI가 영원히
+                    //   "사이드카 기동 중"에 갇힌다 (Track B 실측 10호: 검색 입력 잠김).
+                    let handle = app.state::<Arc<SidecarHandle>>();
+                    handle.emit_status("ready", None);
                 }
                 let _ = app.emit(SIDECAR_EVENT, value);
             }
