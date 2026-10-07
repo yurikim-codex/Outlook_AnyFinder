@@ -13,7 +13,7 @@
  *   TAURI_SIGNING_PRIVATE_KEY = updater.key 내용
  *   TAURI_SIGNING_PRIVATE_KEY_PASSWORD = (비밀번호 없음 = 빈 문자열)
  */
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,12 +32,12 @@ if (!patchOnly) {
   } else {
     fs.mkdirSync(KEY_DIR, { recursive: true });
     console.log("updater 서명 키쌍 생성 중…");
-    // Windows: npx는 npx.cmd — execFileSync가 .cmd를 직접 spawn 못 해 ENOENT
-    // (Track B 실측 5호). shell 경유로 해결.
-    execFileSync("npx", ["tauri", "signer", "generate", "-w", KEY_PATH, "-p", ""], {
+    // Windows: npx는 npx.cmd라 execFileSync로 직접 spawn 불가(ENOENT/EINVAL).
+    // shell 경유 execSync + 수동 인용부호로 해결 (빈 비밀번호 "" 보존 포함,
+    // Track B 실측 5호).
+    execSync(`npx tauri signer generate -w "${KEY_PATH}" -p ""`, {
       cwd: ROOT,
       stdio: "inherit",
-      shell: process.platform === "win32",
     });
   }
 }
