@@ -92,19 +92,21 @@ powershell -ExecutionPolicy Bypass -File tools\create-cert.ps1
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content tools\updater-keys\updater.key -Raw
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
 npm run build
-# 기대: bundle\nsis\*setup.exe + latest.json + .sig, 빌드 로그에 "[sign-one] ✔" 3회
+# 기대: bundle\nsis\*setup.exe + *setup.exe.sig (Tauri v2 CLI는 여기까지 생성)
+node tools\make-latest-json.mjs
+# 기대: bundle\nsis\latest.json 생성 (v2 CLI는 latest.json을 안 만듦 — Track B 실측 6호)
 ```
 
 - [ ] 5-1 NSIS 설치본 생성
-- [ ] 5-2 서명 로그 3회 (sidecar/셸/설치본) — cert 없으면 SKIP 경고도 허용(첫 회는 cert 생성 후)
-- [ ] 5-3 latest.json version == 1.0.0
+- [ ] 5-2 서명 로그 (sidecar/셸/설치본) — cert 없으면 SKIP 경고도 허용(첫 회는 cert 생성 후). 빌드 중 "SignTool Error: ...not trusted by the trust provider" 줄은 정상(자체서명 verify /pa 재서명 판정)
+- [ ] 5-3 latest.json version == 1.0.0 (make-latest-json.mjs 산출물)
 - [ ] 5-4 설치본 더블클릭 설치 → VM 체크리스트 A그룹 신속 확인
 - [ ] 5-5 설정>업데이트>확인 → "최신 버전" (Release 미업로드 상태이므로 정상)
 
 ## 6. 롤백 드릴 (S20) — 5분
 
 ```powershell
-.venv\Scripts\python tools\rollback_check.py     # 또는 py -3
+python tools\rollback_check.py          # 또는 py -3 (이 머신에 .venv 없음)
 powershell -ExecutionPolicy Bypass -File tools\rollback_to_legacy.ps1 -SkipBuild
 # legacy 창이 뜨고 기존 인덱스로 검색 되는지 확인 후 종료
 # 복귀: 설치본 재실행 → 재색인 없이 검색

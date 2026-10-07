@@ -34,10 +34,11 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
 npm install                            # 루트 (Tauri CLI)
 npm install --prefix frontend
 npm run build                          # = tauri build
-# 산출물:
+# 산출물 (빌드가 만드는 것):
 #   src-tauri\target\release\bundle\nsis\OutLook AnyFinder_1.0.1_x64-setup.exe
-#   src-tauri\target\release\bundle\nsis\latest.json + *.exe.sig   (업dater 아티팩트)
-# WebView2: offlineInstaller 번들 포함 (사내 망오프라인 VM 대비)
+#   src-tauri\target\release\bundle\nsis\*.exe.sig   (업데이터 서명)
+node tools\make-latest-json.mjs        # latest.json은 별도 생성 (Tauri v2 CLI는 안 만듦)
+# WebView2: offlineInstaller 번들 포함 (사내 망오프라인 VM 대비 → 설치본 ~234MB 정상)
 ```
 
 ## 4. 코드 서명 (5-5)
