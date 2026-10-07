@@ -75,7 +75,7 @@
       "endpoints": [
         "https://github.com/yurikim-codex/Outlook_AnyFinder/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI0NDlENTUwNzdFREIyOUUKUldTZXN1MTNVTlZKdEVqMzNieis1RUNFM0xuKzBOYk9FVzdNbUhRZ3hkUU82NVJrY044U2F6U3AK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDREM0JEQTFENjI4RjRFRTcKUldUblRvOWlIZG83VGVkaGVrbUdESm1yaTJYU0x4ZnViZWtHSWVJN1JSV29QaWkvaXBWVXpneVgK",
       "windows": {
         "installMode": "passive"
       }
