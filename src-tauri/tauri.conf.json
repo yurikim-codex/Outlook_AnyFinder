@@ -54,7 +54,7 @@
           "-ExecutionPolicy",
           "Bypass",
           "-File",
-          "tools/sign-one.ps1",
+          "../tools/sign-one.ps1",
           "%1"
         ]
       },

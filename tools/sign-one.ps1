@@ -10,7 +10,7 @@
 #>
 param([Parameter(Position = 0)][string]$Target)
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"   # native stderr가 Stop을 만나면 스크립트 즉사 (PS 5.1 함정)
 $Root = Split-Path -Parent $Script:MyInvocation.MyCommand.Path | Split-Path -Parent
 
 $pfx = $env:SIGN_PFX
@@ -35,10 +35,25 @@ if (-not $signtool) {
     $signtool = $candidate.FullName
 }
 
-& $signtool sign /f $pfx /p $password /fd SHA256 /tr $timestamp /td SHA256 $Target
+# tauri 번들러는 signCommand 출력을 캡처해 실패 시 "failed to run powershell"만
+# 보여준다 — 실 진단은 %TEMP%\anyfinder-sign-one.log 에 남긴다 (Track B 실측 5호).
+$logFile = Join-Path $env:TEMP "anyfinder-sign-one.log"
+"[$(Get-Date -Format s)] Target=$Target pfx=$pfx signtool=$signtool" | Add-Content -Path $logFile -Encoding UTF8
+
+& $signtool sign /f $pfx /p $password /fd SHA256 /tr $timestamp /td SHA256 $Target 2>&1 |
+  ForEach-Object { "$_" } | Tee-Object -FilePath $logFile -Append
+if ($LASTEXITCODE -ne 0) {
+  # 타임스탬프 서버(외부망) 차단 환경 대응: 자체서명 사내 배포는 타임스탬프 없이도 유효
+  Write-Host "[sign-one] 타임스탬프 서명 실패 → /tr 없이 재시도" -ForegroundColor Yellow
+  "[$(Get-Date -Format s)] retry without timestamp (prev exit=$LASTEXITCODE)" | Add-Content -Path $logFile -Encoding UTF8
+  & $signtool sign /f $pfx /p $password /fd SHA256 $Target 2>&1 |
+    ForEach-Object { "$_" } | Tee-Object -FilePath $logFile -Append
+}
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[sign-one] 서명 실패: $Target" -ForegroundColor Red
+    "[$(Get-Date -Format s)] FAILED exit=$LASTEXITCODE" | Add-Content -Path $logFile -Encoding UTF8
     exit 1
 }
 Write-Host "[sign-one] ✔ $Target" -ForegroundColor Green
+"[$(Get-Date -Format s)] OK" | Add-Content -Path $logFile -Encoding UTF8
 exit 0

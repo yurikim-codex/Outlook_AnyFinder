@@ -32,9 +32,12 @@ if (!patchOnly) {
   } else {
     fs.mkdirSync(KEY_DIR, { recursive: true });
     console.log("updater 서명 키쌍 생성 중…");
+    // Windows: npx는 npx.cmd — execFileSync가 .cmd를 직접 spawn 못 해 ENOENT
+    // (Track B 실측 5호). shell 경유로 해결.
     execFileSync("npx", ["tauri", "signer", "generate", "-w", KEY_PATH, "-p", ""], {
       cwd: ROOT,
       stdio: "inherit",
+      shell: process.platform === "win32",
     });
   }
 }

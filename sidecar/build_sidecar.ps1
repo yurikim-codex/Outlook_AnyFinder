@@ -34,11 +34,21 @@ Write-Host "=== OutLook AnyFinder Sidecar Build ===" -ForegroundColor Cyan
 Write-Host "Project root : $ProjectRoot"
 
 # 1) PyInstaller 확인/설치
-$pyinstallerCheck = & $Python.Split(" ")[0] $Python.Split(" ")[1..($Python.Split(" ").Length-1)] -m PyInstaller --version 2>$null
-if ($LASTEXITCODE -ne 0) {
+# (PS 5.1 함정: EAP=Stop에서 native stderr가 NativeCommandError로 스크립트를
+#  즉사시킴 — Track B 실측 5호. 확인 구간만 EAP를 임시로 Continue로 내린다.)
+$eapBak = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$pyiParts = @($Python.Split(" ") | Where-Object { $_ })
+$pyiExe = $pyiParts[0]
+$pyiPre = @()
+if ($pyiParts.Length -gt 1) { $pyiPre = @($pyiParts[1..($pyiParts.Length - 1)]) }
+& $pyiExe @pyiPre -m PyInstaller --version 2>$null | Out-Null
+$pyiMissing = ($LASTEXITCODE -ne 0)
+if ($pyiMissing) {
     Write-Host "Installing PyInstaller..." -ForegroundColor Yellow
-    Invoke-Expression "$Python -m pip install pyinstaller"
+    & $pyiExe @pyiPre -m pip install pyinstaller 2>&1 | Select-Object -Last 2
 }
+$ErrorActionPreference = $eapBak
 
 # 2) 빌드 (--onedir + --console)
 $cleanFlag = if ($NoClean) { @() } else { @("--clean") }
