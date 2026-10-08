@@ -1,3 +1,6 @@
+/* 컴포넌트 클래스는 @layer components로 — Tailwind utilities(pl-8 등)가
+   이겨야 아이콘-입력겹침 같은 패딩 오버라이드가 동작한다 (Track B 실측 11호). */
+@layer components {
 /* 테마 토큰 — 3종 (dark / light / warm-dark). CSS 변수만 사용해 컴포넌트는 테마를 모름. */
 
 :root,
@@ -197,4 +200,6 @@ mark,
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
 }
