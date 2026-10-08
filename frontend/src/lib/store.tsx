@@ -372,6 +372,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     jobRunningRef.current = job.running;
   }, [job.running]);
 
+  // ── 상태 폴링 (실측 10호 후속): ready 이벤트/status 이벤트가 프런트엔드
+  //    구독 등록보다 먼저 발행되면 영구 누락되어 UI가 "기동 중"에 갇힌다.
+  //    마운트 시 1회 + 3초 주기 폴링으로 어떤 타이밍이더라도 스스로 회복한다.
+  useEffect(() => {
+    let alive = true;
+    const tick = () => {
+      transport
+        .status()
+        .then((s) => {
+          if (!alive) return;
+          readyRef.current = s.ready;
+          setStatus(s);
+          if (s.ready && !bootstrapped.current) {
+            bootstrapped.current = true;
+            void bootstrap();
+          }
+        })
+        .catch(() => undefined);
+    };
+    tick();
+    const timer = window.setInterval(tick, 3000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [transport, bootstrap]);
+
   // ── 사이드카 이벤트 구독 ──
 
   useEffect(() => {
